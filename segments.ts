@@ -47,12 +47,18 @@ const modelSegment: StatusLineSegment = {
     const opts = ctx.options.model ?? {};
 
     let modelName = ctx.model?.name || ctx.model?.id || "no-model";
+    const provider = typeof (ctx.model as { provider?: unknown } | undefined)?.provider === "string"
+      ? (ctx.model as { provider: string }).provider
+      : "";
     // Strip "Claude " prefix for brevity
     if (modelName.startsWith("Claude ")) {
       modelName = modelName.slice(7);
     }
 
     let content = withIcon(icons.model, modelName);
+    if (provider && !modelName.startsWith(`${provider}/`)) {
+      content += `${SEP_DOT}${provider}`;
+    }
 
     if (opts.showThinkingLevel !== false && ctx.model?.reasoning) {
       const level = ctx.thinkingLevel || "off";
