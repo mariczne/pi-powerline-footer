@@ -57,7 +57,7 @@ const modelSegment: StatusLineSegment = {
 
     let content = withIcon(icons.model, modelName);
     if (provider && !modelName.startsWith(`${provider}/`)) {
-      content += `${SEP_DOT}${provider}`;
+      content += ` (${provider})`;
     }
 
     if (opts.showThinkingLevel !== false && ctx.model?.reasoning) {

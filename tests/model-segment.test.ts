@@ -33,7 +33,7 @@ function createSegmentContext(model: SegmentContext["model"]): SegmentContext {
   };
 }
 
-test("model segment appends provider after the model name", () => {
+test("model segment appends provider in parentheses after the model name", () => {
   const rendered = renderSegment("model", createSegmentContext({
     id: "gpt-5.5",
     name: "GPT-5.5",
@@ -43,9 +43,8 @@ test("model segment appends provider after the model name", () => {
   } as SegmentContext["model"]));
 
   assert.equal(rendered.visible, true);
-  assert.match(rendered.content, /GPT-5\.5/);
-  assert.match(rendered.content, /openai-codex/);
-  assert.ok(rendered.content.indexOf("GPT-5.5") < rendered.content.indexOf("openai-codex"));
+  assert.match(rendered.content, /GPT-5\.5 \(openai-codex\)/);
+  assert.doesNotMatch(rendered.content, /GPT-5\.5 · openai-codex/);
 });
 
 test("model segment does not duplicate provider when already prefixed", () => {
