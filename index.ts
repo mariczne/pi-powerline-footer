@@ -34,6 +34,7 @@ import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSession
 import { createWelcomeDismissScheduler } from "./welcome-dismiss.ts";
 import { createRenderScheduler } from "./render-scheduler.ts";
 import { readCoreContextUsage } from "./context-usage.ts";
+import { fetchProviderSubscriptionUsage, getSupportedSubscriptionProvider, type SubscriptionUsage } from "./subscription-usage.ts";
 import { renderFixedEditorCluster } from "./fixed-editor/cluster.ts";
 import { emergencyTerminalModeReset, TerminalSplitCompositor } from "./fixed-editor/terminal-split.ts";
 import { getDefaultColors } from "./theme.ts";
@@ -205,11 +206,20 @@ const STREAMING_LAYOUT_CACHE_TTL_MS = 1000;
 const STATUS_RENDER_DEBOUNCE_MS = 33;
 const CONTEXT_STATUS_RENDER_MS = 250;
 const EDITOR_STATUS_DEFER_MS = 150;
+const SUBSCRIPTION_USAGE_REFRESH_MS = 2 * 60 * 1000;
+const SUBSCRIPTION_USAGE_RETRY_MS = 30 * 1000;
 const PROMPT_HISTORY_TRACKED = Symbol.for("powerlinePromptHistoryTracked");
 const PROMPT_HISTORY_STATE_KEY = Symbol.for("powerlinePromptHistoryState");
 
 type PromptHistoryState = { savedPromptHistory: string[] };
 type SessionAssistantUsage = AssistantMessage["usage"];
+type SupportedSubscriptionProvider = NonNullable<ReturnType<typeof getSupportedSubscriptionProvider>>;
+
+type CachedSubscriptionUsage = {
+  usage: SubscriptionUsage | null;
+  fetchedAt: number;
+  error?: string;
+};
 
 function getUsageTokenTotal(usage: SessionAssistantUsage): number {
   const totalTokens = "totalTokens" in usage && typeof usage.totalTokens === "number" ? usage.totalTokens : 0;
@@ -946,6 +956,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   let getThinkingLevelFn: (() => string) | null = null;
   let currentThinkingLevel: string | null = null;
   let liveAssistantUsage: SessionAssistantUsage | null = null;
+  let subscriptionUsageByProvider = new Map<SupportedSubscriptionProvider, CachedSubscriptionUsage>();
+  let subscriptionUsageInflight = new Map<SupportedSubscriptionProvider, Promise<void>>();
   let isStreaming = false;
   let tuiRef: any = null;
   let restoreFooterStatusRepaintHook: (() => void) | null = null;
@@ -1014,6 +1026,56 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     forceNextLayoutRecompute = true;
     statusRenderScheduler.cancel();
     statusRenderScheduler.schedule(0);
+  };
+
+  const refreshSubscriptionUsage = (ctx: any, provider: SupportedSubscriptionProvider) => {
+    const model = ctx?.model;
+    if (!model || model.provider !== provider || !ctx?.modelRegistry?.getApiKeyAndHeaders) {
+      return;
+    }
+
+    if (subscriptionUsageInflight.has(provider)) {
+      return;
+    }
+
+    const refreshPromise = (async () => {
+      const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+      if (!auth?.ok) {
+        throw new Error(typeof auth?.error === "string" ? auth.error : "failed to resolve model auth");
+      }
+
+      const usage = await fetchProviderSubscriptionUsage(provider, auth.apiKey, auth.headers);
+      subscriptionUsageByProvider.set(provider, { usage, fetchedAt: usage.fetchedAt });
+    })()
+      .catch((error: unknown) => {
+        subscriptionUsageByProvider.set(provider, {
+          usage: null,
+          fetchedAt: Date.now(),
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        subscriptionUsageInflight.delete(provider);
+        requestImmediateStatusRender({ deferDuringTyping: false });
+      });
+
+    subscriptionUsageInflight.set(provider, refreshPromise);
+  };
+
+  const ensureSubscriptionUsage = (ctx: any) => {
+    const model = ctx?.model;
+    const provider = getSupportedSubscriptionProvider(model);
+    if (!provider || !(ctx?.modelRegistry?.isUsingOAuth?.(model) ?? false)) {
+      return;
+    }
+
+    const cached = subscriptionUsageByProvider.get(provider);
+    const refreshMs = cached?.error ? SUBSCRIPTION_USAGE_RETRY_MS : SUBSCRIPTION_USAGE_REFRESH_MS;
+    if (cached && Date.now() - cached.fetchedAt < refreshMs) {
+      return;
+    }
+
+    refreshSubscriptionUsage(ctx, provider);
   };
 
   const installFooterStatusRepaintHook = (footerData: ReadonlyFooterDataProvider) => {
@@ -1924,7 +1986,14 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     const usingSubscription = ctx.model
       ? ctx.modelRegistry?.isUsingOAuth?.(ctx.model) ?? false
       : false;
+    if (usingSubscription) {
+      ensureSubscriptionUsage(ctx);
+    }
 
+    const subscriptionUsageProvider = getSupportedSubscriptionProvider(ctx.model);
+    const subscriptionUsage = usingSubscription && subscriptionUsageProvider
+      ? subscriptionUsageByProvider.get(subscriptionUsageProvider)?.usage ?? null
+      : null;
     const thinkingLevel = currentThinkingLevel ?? thinkingLevelFromSession ?? getThinkingLevelFn?.() ?? "off";
 
     return {
@@ -1938,6 +2007,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       autoCompactEnabled: ctx.settingsManager?.getCompactionSettings?.()?.enabled ?? true,
       customCompactionEnabled: customCompactionEnabled || extensionStatuses.has(CUSTOM_COMPACTION_STATUS_KEY),
       usingSubscription,
+      subscriptionUsage,
       sessionStartTime,
       shellModeActive: bashModeActive,
       shellRunning: shellSession?.state.running ?? false,

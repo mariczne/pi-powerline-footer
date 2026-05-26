@@ -5,6 +5,7 @@ import type { BuiltinStatusLineSegmentId, RenderedSegment, SegmentContext, Seman
 import { normalizeCompactExtensionStatus, normalizeExtensionStatusValue } from "./powerline-config.ts";
 import { fg, rainbow, applyColor } from "./theme.ts";
 import { getIcons, SEP_DOT, getThinkingText } from "./icons.ts";
+import { formatSubscriptionUsageSummary } from "./subscription-usage.ts";
 
 function color(ctx: SegmentContext, semantic: SemanticColor, text: string): string {
   return fg(ctx.theme, semantic, text, ctx.colors);
@@ -274,7 +275,10 @@ const costSegment: StatusLineSegment = {
       return { content: "", visible: false };
     }
 
-    const costDisplay = usingSubscription ? "(sub)" : `$${cost.toFixed(2)}`;
+    const subscriptionSummary = ctx.subscriptionUsage ? ` ${formatSubscriptionUsageSummary(ctx.subscriptionUsage)}` : "";
+    const costDisplay = usingSubscription
+      ? `(sub${subscriptionSummary})`
+      : `$${cost.toFixed(2)}`;
     return { content: color(ctx, "cost", costDisplay), visible: true };
   },
 };

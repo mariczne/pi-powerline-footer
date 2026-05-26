@@ -1,4 +1,5 @@
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { SubscriptionUsage } from "./subscription-usage.ts";
 
 // Theme color - either a pi theme color name or a custom hex color
 export type ColorValue = ThemeColor | `#${string}`;
@@ -152,6 +153,7 @@ export interface SegmentContext {
   autoCompactEnabled: boolean;
   customCompactionEnabled: boolean;
   usingSubscription: boolean;
+  subscriptionUsage: SubscriptionUsage | null;
   sessionStartTime: number;
   shellModeActive: boolean;
   shellRunning: boolean;

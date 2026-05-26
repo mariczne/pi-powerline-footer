@@ -22,6 +22,7 @@ function createSegmentContext(thinkingLevel: string, colors: ColorScheme): Segme
     autoCompactEnabled: true,
     customCompactionEnabled: false,
     usingSubscription: false,
+    subscriptionUsage: null,
     sessionStartTime: Date.now(),
     shellModeActive: false,
     shellRunning: false,

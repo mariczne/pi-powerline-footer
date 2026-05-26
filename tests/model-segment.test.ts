@@ -14,6 +14,7 @@ function createSegmentContext(model: SegmentContext["model"]): SegmentContext {
     autoCompactEnabled: true,
     customCompactionEnabled: false,
     usingSubscription: false,
+    subscriptionUsage: null,
     sessionStartTime: Date.now(),
     shellModeActive: false,
     shellRunning: false,
