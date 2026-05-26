@@ -4,15 +4,13 @@
 
 # pi-powerline-footer
 
-Customizes the default [pi](https://github.com/badlogic/pi-mono) editor with a powerline-style status bar, welcome overlay, and AI-generated "vibes" for loading messages. Inspired by [Powerlevel10k](https://github.com/romkatv/powerlevel10k) and [oh-my-pi](https://github.com/can1357/oh-my-pi).
+Customizes the default [pi](https://github.com/badlogic/pi-mono) editor with a powerline-style status bar and welcome overlay. Inspired by [Powerlevel10k](https://github.com/romkatv/powerlevel10k) and [oh-my-pi](https://github.com/can1357/oh-my-pi).
 
 <img width="1261" height="817" alt="Image" src="https://github.com/user-attachments/assets/4cc43320-3fb8-4503-b857-69dffa7028f2" />
 
 ## Features
 
 **Editor stash** — Press `Alt+S` to save your editor content and clear the editor, type a quick prompt, and your stashed text auto-restores when the agent finishes. Toggles between stash, pop, and update-existing-stash. A `stash` indicator appears in the powerline bar while text is stashed.
-
-**Working Vibes** — AI-generated themed loading messages. Set `/vibe star trek` and your "Working..." becomes "Running diagnostics..." or "Engaging warp drive...". Supports any theme: pirate, zen, noir, cowboy, etc.
 
 **Welcome overlay** — Branded splash screen shown as centered overlay on startup. Shows gradient logo, model info, keyboard tips, loaded AGENTS.md/extensions/skills/templates counts, and recent sessions. Auto-dismisses after 30 seconds or on any key press.
 
@@ -225,73 +223,6 @@ You can override shortcut keys in `~/.pi/agent/settings.json`:
 ```
 
 After changing bindings, run `/reload`. Invalid bindings, reserved key conflicts (like `Alt+S`), or duplicate conflicts automatically fall back to safe defaults. `cmd` and `command` are accepted aliases for Pi's `super` modifier for the documented Command navigation keys; unsupported Command-letter bindings such as `cmd+c` are ignored instead of matching plain text input. Some terminals, including Ghostty, bind Command+Arrow themselves; remap those terminal keys to send `\x1b[1;9A` / `\x1b[1;9B` for chat scrolling and `\x1b[1;10A` / `\x1b[1;10B` for editor-boundary navigation if you want Pi to receive them.
-
-## Working Vibes
-
-Transform boring "Working..." messages into themed phrases that match your style:
-
-```
-/vibe star trek    → "Running diagnostics...", "Engaging warp drive..."
-/vibe pirate       → "Hoisting the sails...", "Charting course..."
-/vibe zen          → "Breathing deeply...", "Finding balance..."
-/vibe noir         → "Following the trail...", "Checking the angles..."
-/vibe              → Shows current theme, mode, and model
-/vibe off          → Disables (back to "Working...")
-/vibe model        → Shows current model
-/vibe model openai/gpt-4o-mini → Use a different model
-/vibe mode         → Shows current mode (generate or file)
-/vibe mode file    → Switch to file-based mode (instant, no API calls)
-/vibe mode generate → Switch to on-demand generation (contextual)
-/vibe generate mafia 200 → Pre-generate 200 vibes and save to file
-```
-
-### Configuration
-
-In `~/.pi/agent/settings.json`:
-
-```json
-{
-  "workingVibe": "star trek",                              // Theme phrase
-  "workingVibeMode": "generate",                           // "generate" (on-demand) or "file" (pre-generated)
-  "workingVibeModel": "openai-codex/gpt-5.4-mini",         // Optional: model to use (default)
-  "workingVibeFallback": "Working",                        // Optional: fallback message
-  "workingVibeRefreshInterval": 30,                        // Optional: seconds between refreshes (default 30)
-  "workingVibePrompt": "Generate a {theme} loading message for: {task}",  // Optional: custom prompt template
-  "workingVibeMaxLength": 65                         // Optional: max message length (default 65)
-}
-```
-
-### Modes
-
-| Mode | Description | Pros | Cons |
-|------|-------------|------|------|
-| `generate` | On-demand AI generation (default) | Contextual, hints at actual task | Model-dependent cost and latency |
-| `file` | Pull from pre-generated file | Instant, zero cost, works offline | Not contextual |
-
-**File mode setup:**
-```bash
-/vibe generate mafia 200    # Generate 200 vibes, save to ~/.pi/agent/vibes/mafia.txt
-/vibe mode file             # Switch to file mode
-/vibe mafia                 # Now uses the file
-```
-
-**How file mode works:**
-1. Vibes are loaded from `~/.pi/agent/vibes/{theme}.txt` into memory
-2. Uses seeded shuffle (Mulberry32 PRNG) — cycles through all vibes before repeating
-3. New seed each session — different order every time you restart pi
-4. Zero latency, zero cost, works offline
-
-**Prompt template variables (generate mode only):**
-- `{theme}` — the current vibe theme (e.g., "star trek", "mafia")
-- `{task}` — context hint (user prompt initially, then agent's response text or tool info on refresh)
-- `{exclude}` — recent vibes to avoid (auto-populated, e.g., "Don't use: vibe1, vibe2...")
-
-**How it works:**
-1. When you send a message, shows "Channeling {theme}..." placeholder
-2. AI generates a themed message in the background (3s timeout)
-3. Message updates to the themed version (e.g., "Engaging warp drive...")
-4. During long tasks, refreshes on tool calls (rate-limited, default 30s)
-5. Cost and latency depend on your configured `workingVibeModel`
 
 ## Thinking Level Display
 
