@@ -295,6 +295,43 @@ test("terminal split restores main screen mode when Kitty activates after instal
   assert.ok(cleanup.indexOf("\x1b[?1049l") < cleanup.indexOf("\x1b[>7u"));
 });
 
+test("terminal split pushes Kitty flags on the alternate screen once protocol settles after install", () => {
+  const terminal = new FakeTerminal();
+  // Kitty negotiation is async (pi >=0.77), so it is still inactive at install.
+  terminal.kittyProtocolActive = false;
+  const tui = {
+    terminal,
+    render() {
+      return ["chat"];
+    },
+    doRender() {
+      this.terminal.write("body");
+    },
+  };
+  const compositor = new TerminalSplitCompositor({
+    tui,
+    terminal,
+    renderCluster: () => ({ lines: ["cluster"], cursor: null }),
+  });
+
+  compositor.install();
+  assert.ok(!(terminal.writes[0] ?? "").includes("\x1b[>7u"));
+
+  // Negotiation completes, then the TUI repaints.
+  terminal.kittyProtocolActive = true;
+  const writesBefore = terminal.writes.length;
+  tui.render(terminal.columns);
+  tui.render(terminal.columns);
+
+  const pushes = terminal.writes.slice(writesBefore).filter((w) => w.includes("\x1b[>7u"));
+  assert.equal(pushes.length, 1, "should push Kitty flags exactly once after activation");
+
+  compositor.dispose();
+  const cleanup = terminal.writes.at(-1) ?? "";
+  assert.ok(cleanup.includes("\x1b[<u"));
+  assert.ok(cleanup.indexOf("\x1b[<u") < cleanup.indexOf("\x1b[?1049l"));
+});
+
 test("terminal split restores main screen mode when modifyOtherKeys activates after install", () => {
   const terminal = new FakeTerminal();
   const compositor = new TerminalSplitCompositor({

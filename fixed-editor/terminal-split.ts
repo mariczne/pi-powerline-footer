@@ -563,6 +563,7 @@ export class TerminalSplitCompositor {
   }
 
   private renderScrollableRoot(width: number): string[] {
+    this.ensureAlternateScreenKeyboardMode();
     if (!this.originalRender || this.disposed || this.renderingScrollableRoot) {
       return this.originalRender?.(width) ?? [];
     }
@@ -953,6 +954,19 @@ export class TerminalSplitCompositor {
   private enableAlternateScreenKeyboardMode(): string {
     this.extendedKeyboardMode = this.activeExtendedKeyboardMode();
     return this.extendedKeyboardMode ? enableExtendedKeyboardMode(this.extendedKeyboardMode) : "";
+  }
+
+  // Kitty keyboard protocol negotiation is asynchronous (pi >=0.77 buffers/
+  // delays the terminal response), so kittyProtocolActive can still be false
+  // when install() runs. The alternate screen keeps its own keyboard-protocol
+  // stack, so if we never push the flags here, Shift+Enter degrades to a bare
+  // \r and submits. Re-check on each render and push once the mode resolves.
+  private ensureAlternateScreenKeyboardMode(): void {
+    if (this.disposed || this.extendedKeyboardMode !== null) return;
+    const mode = this.activeExtendedKeyboardMode();
+    if (!mode) return;
+    this.extendedKeyboardMode = mode;
+    this.originalWrite(enableExtendedKeyboardMode(mode));
   }
 
   private restoreTerminalState(options: DisposeOptions = {}): void {
