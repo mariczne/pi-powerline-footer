@@ -1,4 +1,11 @@
 import { fetchAnthropicSubscriptionUsage, parseAnthropicSubscriptionUsage } from "./sub-usages/anthropic.ts";
+import {
+  fetchCopilotSubscriptionUsage,
+  parseCopilotQuotaHeader,
+  parseCopilotRateLimitHeaders,
+  parseCopilotResponseHeaders,
+  parseCopilotSubscriptionUsage,
+} from "./sub-usages/github-copilot.ts";
 import { fetchCodexSubscriptionUsage, parseCodexSubscriptionUsage } from "./sub-usages/openai-codex.ts";
 import {
   fetchOpencodeGoSubscriptionUsage,
@@ -12,16 +19,19 @@ export const SUPPORTED_SUBSCRIPTION_PROVIDERS = [
   "anthropic",
   "openai-codex",
   "opencode-go",
+  "github-copilot",
 ] as const;
 
 export type SupportedSubscriptionProvider = typeof SUPPORTED_SUBSCRIPTION_PROVIDERS[number];
 
 export interface SubscriptionUsage {
   provider: SupportedSubscriptionProvider;
-  sessionPercent: number;
-  weeklyPercent: number;
+  sessionPercent?: number;
+  weeklyPercent?: number;
   sessionResetAt?: number;
   weeklyResetAt?: number;
+  sessionLabel?: string;
+  weeklyLabel?: string;
   fetchedAt: number;
 }
 
@@ -35,6 +45,7 @@ const SUBSCRIPTION_USAGE_FETCHERS: Record<SupportedSubscriptionProvider, Subscri
   anthropic: fetchAnthropicSubscriptionUsage,
   "openai-codex": fetchCodexSubscriptionUsage,
   "opencode-go": fetchOpencodeGoSubscriptionUsage,
+  "github-copilot": fetchCopilotSubscriptionUsage,
 };
 
 function isSupportedSubscriptionProvider(value: unknown): value is SupportedSubscriptionProvider {
@@ -94,10 +105,14 @@ export function isSubscriptionUsageEnabled(
 }
 
 export function formatSubscriptionUsageSummary(usage: SubscriptionUsage, nowMs = Date.now()): string {
-  return [
-    formatUsageWindow("5h", invertPercent(usage.sessionPercent), usage.sessionResetAt, nowMs),
-    formatUsageWindow("7d", invertPercent(usage.weeklyPercent), usage.weeklyResetAt, nowMs),
-  ].join(" ");
+  const windows: string[] = [];
+  if (typeof usage.sessionPercent === "number") {
+    windows.push(formatUsageWindow(usage.sessionLabel ?? "5h", invertPercent(usage.sessionPercent), usage.sessionResetAt, nowMs));
+  }
+  if (typeof usage.weeklyPercent === "number") {
+    windows.push(formatUsageWindow(usage.weeklyLabel ?? "7d", invertPercent(usage.weeklyPercent), usage.weeklyResetAt, nowMs));
+  }
+  return windows.join(" ");
 }
 
 export async function fetchProviderSubscriptionUsage(
@@ -109,19 +124,30 @@ export async function fetchProviderSubscriptionUsage(
   const parsed = await SUBSCRIPTION_USAGE_FETCHERS[provider](apiKey, headers, config);
   if (!parsed) throw new Error("unrecognized usage response");
 
-  return {
+  const usage: SubscriptionUsage = {
     provider,
-    sessionPercent: parsed.sessionPercent,
-    weeklyPercent: parsed.weeklyPercent,
-    sessionResetAt: parsed.sessionResetAt,
-    weeklyResetAt: parsed.weeklyResetAt,
     fetchedAt: config.nowMs ?? Date.now(),
   };
+  if (typeof parsed.sessionPercent === "number") {
+    usage.sessionPercent = parsed.sessionPercent;
+    usage.sessionResetAt = parsed.sessionResetAt;
+    if (parsed.sessionLabel) usage.sessionLabel = parsed.sessionLabel;
+  }
+  if (typeof parsed.weeklyPercent === "number") {
+    usage.weeklyPercent = parsed.weeklyPercent;
+    usage.weeklyResetAt = parsed.weeklyResetAt;
+    if (parsed.weeklyLabel) usage.weeklyLabel = parsed.weeklyLabel;
+  }
+  return usage;
 }
 
 export {
   parseAnthropicSubscriptionUsage,
   parseCodexSubscriptionUsage,
+  parseCopilotQuotaHeader,
+  parseCopilotRateLimitHeaders,
+  parseCopilotResponseHeaders,
+  parseCopilotSubscriptionUsage,
   parseOpencodeGoDashboardUsage,
   parseOpencodeGoSubscriptionUsage,
 };

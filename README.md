@@ -23,13 +23,17 @@ coding agent.
 - **Subscription quota windows in the footer.** When the active model has a
   supported subscription usage source, the `cost` segment shows live usage
   windows instead of a bare `(sub)`. Supported providers: `anthropic`,
-  `openai-codex`, and `opencode-go`. Anthropic/OpenAI usage is fetched through
-  model-registry auth. Opencode Go scrapes the dashboard and requires
-  `OPENCODE_GO_WORKSPACE_ID` plus `OPENCODE_GO_AUTH_COOKIE`; monthly usage is
-  intentionally ignored for now. Usage is cached for 2 minutes (30s on error)
-  and refreshed only while streaming with an active subscription. Implemented in
-  `subscription-usage.ts`; the parsed usage is exposed to segments via
-  `ctx.subscriptionUsage`.
+  `openai-codex`, `opencode-go`, and `github-copilot`. Anthropic/OpenAI usage is
+  fetched through model-registry auth. Opencode Go scrapes the dashboard and
+  requires `OPENCODE_GO_WORKSPACE_ID` plus `OPENCODE_GO_AUTH_COOKIE`; monthly
+  usage is intentionally ignored for now. GitHub Copilot fetches monthly credit
+  usage from `api.github.com/copilot_internal/user` and renders a single `30d`
+  window (the reliable endpoint exposes monthly quota only; the 2026-06-01
+  usage-based-billing change moved 5h/weekly rate limits onto live Copilot
+  response headers, which this footer does not capture). Usage is cached for 2
+  minutes (30s on error) and refreshed only while streaming with an active
+  subscription. Implemented in `subscription-usage.ts`; the parsed usage is
+  exposed to segments via `ctx.subscriptionUsage`.
 
 - **Fixed-editor Shift+Enter restored on pi 0.77+.** The Kitty keyboard
   protocol negotiation is asynchronous on pi 0.77+, so the alternate screen's

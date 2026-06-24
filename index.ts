@@ -35,6 +35,7 @@ import { createWelcomeDismissScheduler } from "./welcome-dismiss.ts";
 import { createRenderScheduler } from "./render-scheduler.ts";
 import { readCoreContextUsage } from "./context-usage.ts";
 import { fetchProviderSubscriptionUsage, getSupportedSubscriptionProvider, isSubscriptionUsageEnabled, type SubscriptionUsage } from "./subscription-usage.ts";
+import { parseCopilotResponseHeaders } from "./sub-usages/github-copilot.ts";
 import { renderFixedEditorCluster } from "./fixed-editor/cluster.ts";
 import { emergencyTerminalModeReset, TerminalSplitCompositor } from "./fixed-editor/terminal-split.ts";
 import { getDefaultColors } from "./theme.ts";
@@ -1050,7 +1051,17 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         throw new Error(typeof auth?.error === "string" ? auth.error : "failed to resolve model auth");
       }
 
-      const usage = await fetchProviderSubscriptionUsage(provider, auth.apiKey, auth.headers);
+      let usageApiKey = auth.apiKey;
+      let usageHeaders = auth.headers;
+      if (provider === "github-copilot") {
+        const cred = ctx.modelRegistry?.authStorage?.get?.("github-copilot");
+        if (cred?.type === "oauth" && typeof cred.refresh === "string") {
+          usageApiKey = cred.refresh;
+          usageHeaders = undefined;
+        }
+      }
+
+      const usage = await fetchProviderSubscriptionUsage(provider, usageApiKey, usageHeaders);
       subscriptionUsageByProvider.set(provider, { usage, fetchedAt: usage.fetchedAt });
     })()
       .catch((error: unknown) => {
@@ -1252,6 +1263,31 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     );
   }
 
+  // TEMPORARY WORKAROUND: pi-ai's generated model catalog omits
+  // supportsEagerToolInputStreaming: false for most GitHub Copilot models
+  // that use the anthropic-messages API (e.g. claude-opus-4.5 has compat:
+  // undefined, claude-opus-4.6 has compat but no eager flag). Without the
+  // flag, the Anthropic provider defaults to sending eager_input_streaming:
+  // true on tool definitions, which the Copilot API rejects with a 400
+  // "tools.0.custom.eager_input_streaming: Extra inputs are not permitted".
+  // OpenAI-based Copilot models (gpt-5.4 etc.) are unaffected because the
+  // OpenAI provider never adds that field. This patch fills in the missing
+  // flag on both the registry array and the currently-selected model. Remove
+  // once pi-ai ships correct compat entries for all Copilot models.
+  function patchCopilotModelCompat(ctx: any) {
+    const fixModel = (model: any) => {
+      if (model?.provider !== "github-copilot") return;
+      if (model?.api !== "anthropic-messages") return;
+      (model.compat ??= {}).supportsEagerToolInputStreaming = false;
+    };
+
+    const models = ctx?.modelRegistry?.models;
+    if (Array.isArray(models)) {
+      for (const model of models) fixModel(model);
+    }
+    fixModel(ctx?.model);
+  }
+
   // Track session start
   pi.on("session_start", async (event, ctx) => {
     shellSession?.dispose();
@@ -1264,6 +1300,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     isStreaming = false;
     liveAssistantUsage = null;
     stashedEditorText = null;
+
+    patchCopilotModelCompat(ctx);
 
     const settings = readSettings(ctx.cwd);
     bashModeSettings = parseBashModeSettings(settings);
@@ -1375,6 +1413,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   pi.on("model_select", async (_event, ctx) => {
     currentCtx = ctx;
+    patchCopilotModelCompat(ctx);
     requestStatusRender();
   });
 
@@ -1435,6 +1474,32 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   pi.on("tool_call", async (_event, ctx) => {
     dismissWelcome(ctx);
+  });
+
+  pi.on("after_provider_response", async (event, _ctx) => {
+    const model = currentCtx?.model;
+    if (model?.provider !== "github-copilot") return;
+    const headers = (event as any)?.headers;
+    if (!headers || typeof headers !== "object") return;
+
+    const parsed = parseCopilotResponseHeaders(headers as Record<string, string>);
+    if (!parsed) return;
+
+    const nowMs = Date.now();
+    const usage: SubscriptionUsage = { provider: "github-copilot", fetchedAt: nowMs };
+    if (typeof parsed.sessionPercent === "number") {
+      usage.sessionPercent = parsed.sessionPercent;
+      usage.sessionResetAt = parsed.sessionResetAt;
+      if (parsed.sessionLabel) usage.sessionLabel = parsed.sessionLabel;
+    }
+    if (typeof parsed.weeklyPercent === "number") {
+      usage.weeklyPercent = parsed.weeklyPercent;
+      usage.weeklyResetAt = parsed.weeklyResetAt;
+      if (parsed.weeklyLabel) usage.weeklyLabel = parsed.weeklyLabel;
+    }
+
+    subscriptionUsageByProvider.set("github-copilot", { usage, fetchedAt: nowMs });
+    requestImmediateStatusRender({ deferDuringTyping: false });
   });
 
   function dismissWelcome(ctx: any) {

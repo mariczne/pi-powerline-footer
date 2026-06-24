@@ -7,6 +7,10 @@ import {
   isSubscriptionUsageEnabled,
   parseAnthropicSubscriptionUsage,
   parseCodexSubscriptionUsage,
+  parseCopilotQuotaHeader,
+  parseCopilotRateLimitHeaders,
+  parseCopilotResponseHeaders,
+  parseCopilotSubscriptionUsage,
   parseOpencodeGoDashboardUsage,
   parseOpencodeGoSubscriptionUsage,
 } from "../subscription-usage.ts";
@@ -15,6 +19,7 @@ test("supported subscription provider detection only accepts providers with usag
   assert.equal(getSupportedSubscriptionProvider({ provider: "anthropic" }), "anthropic");
   assert.equal(getSupportedSubscriptionProvider({ provider: "openai-codex" }), "openai-codex");
   assert.equal(getSupportedSubscriptionProvider({ provider: "opencode-go" }), "opencode-go");
+  assert.equal(getSupportedSubscriptionProvider({ provider: "github-copilot" }), "github-copilot");
   assert.equal(getSupportedSubscriptionProvider({ provider: "opencode" }), null);
   assert.equal(getSupportedSubscriptionProvider({ provider: "openai" }), null);
   assert.equal(getSupportedSubscriptionProvider(undefined), null);
@@ -33,6 +38,8 @@ test("subscription usage auth policy allows opencode go api keys", () => {
   assert.equal(isSubscriptionUsageEnabled("anthropic", true), true);
   assert.equal(isSubscriptionUsageEnabled("openai-codex", false), false);
   assert.equal(isSubscriptionUsageEnabled("openai-codex", true), true);
+  assert.equal(isSubscriptionUsageEnabled("github-copilot", false), false);
+  assert.equal(isSubscriptionUsageEnabled("github-copilot", true), true);
   assert.equal(isSubscriptionUsageEnabled(null, true), false);
 });
 
@@ -235,4 +242,202 @@ test("anthropic usage fetch appends the oauth beta header", async () => {
 
   assert.equal(headers?.Authorization, "Bearer claude-token");
   assert.equal(headers?.["anthropic-beta"], "foo,oauth-2025-04-20");
+});
+
+test("copilot usage parser reads premium_models monthly quota as a 30d window", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotSubscriptionUsage({
+    quota_reset_date: "2026-07-01T00:00:00.000Z",
+    quota_snapshots: {
+      premium_models: {
+        entitlement: 1000,
+        percent_remaining: 40,
+        overage_permitted: true,
+        overage_count: 0,
+        unlimited: false,
+      },
+    },
+  }), {
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
+});
+
+test("copilot usage parser falls back to premium_interactions when premium_models is absent", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotSubscriptionUsage({
+    quota_reset_date: "2026-07-01T00:00:00.000Z",
+    quota_snapshots: {
+      premium_interactions: {
+        entitlement: 300,
+        percent_remaining: 75,
+        overage_permitted: false,
+        overage_count: 0,
+        unlimited: false,
+      },
+    },
+  }), {
+    weeklyPercent: 25,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
+});
+
+test("copilot usage parser handles percent_remaining as a string", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotSubscriptionUsage({
+    quota_reset_date: "2026-07-01T00:00:00.000Z",
+    quota_snapshots: {
+      premium_interactions: {
+        entitlement: "1000",
+        percent_remaining: "40.0",
+        unlimited: true,
+      },
+    },
+  }), {
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
+});
+
+test("copilot usage parser uses remaining/entitlement when percent_remaining is absent", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotSubscriptionUsage({
+    quota_reset_date: "2026-07-01T00:00:00.000Z",
+    quota_snapshots: {
+      premium_interactions: {
+        entitlement: 1000,
+        remaining: 400,
+        unlimited: true,
+      },
+    },
+  }), {
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
+});
+
+test("copilot usage parser returns null when no usage data is available", () => {
+  assert.equal(parseCopilotSubscriptionUsage({
+    quota_reset_date: "2026-07-01T00:00:00.000Z",
+    quota_snapshots: {
+      premium_models: { entitlement: -1, unlimited: true },
+    },
+  }), null);
+});
+
+test("copilot usage fetch uses token auth and github api version header", async () => {
+  let url: string | undefined;
+  let headers: Record<string, string> | undefined;
+  const usage = await fetchProviderSubscriptionUsage("github-copilot", "ghp_token", undefined, {
+    nowMs: 123,
+    fetchFn: async (requestUrl, init) => {
+      url = String(requestUrl);
+      headers = init?.headers as Record<string, string>;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            quota_reset_date: "2026-07-01T00:00:00.000Z",
+            quota_snapshots: {
+              premium_models: { entitlement: 1000, percent_remaining: 40, unlimited: false },
+            },
+          };
+        },
+      } as Response;
+    },
+  });
+
+  assert.equal(url, "https://api.github.com/copilot_internal/user");
+  assert.equal(headers?.Authorization, "token ghp_token");
+  assert.equal(headers?.["X-GitHub-Api-Version"], "2025-04-01");
+  assert.deepEqual(usage, {
+    provider: "github-copilot",
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: new Date("2026-07-01T00:00:00.000Z").getTime(),
+    fetchedAt: 123,
+  });
+});
+
+test("copilot monthly-only usage summary renders a single 30d window", () => {
+  const nowMs = new Date(2026, 5, 24, 10, 0, 0, 0).getTime();
+  const resetAt = new Date(2026, 6, 1, 0, 0, 0, 0).getTime();
+  assert.equal(formatSubscriptionUsageSummary({
+    provider: "github-copilot",
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+    fetchedAt: 123,
+  }, nowMs), "[30d 40% 07-01]");
+});
+
+test("copilot quota header parser reads percent_remaining and reset date", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotQuotaHeader("ent=1000&rem=40.0&ov=0&ovPerm=true&rst=2026-07-01T00:00:00.000Z"), {
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
+});
+
+test("copilot rate-limit headers parse session and weekly windows", () => {
+  const sessionReset = new Date("2026-06-24T16:00:00.000Z").getTime();
+  const weeklyReset = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotRateLimitHeaders(
+    "ent=1000&rem=55.0&rst=2026-06-24T16:00:00.000Z",
+    "ent=1000&rem=80.0&rst=2026-07-01T00:00:00.000Z",
+  ), {
+    sessionPercent: 45,
+    sessionLabel: "5h",
+    sessionResetAt: sessionReset,
+    weeklyPercent: 20,
+    weeklyLabel: "7d",
+    weeklyResetAt: weeklyReset,
+  });
+});
+
+test("copilot response headers prefer rate-limit over quota snapshot", () => {
+  const result = parseCopilotResponseHeaders({
+    "x-quota-snapshot-premium_models": "ent=1000&rem=40.0&rst=2026-07-01T00:00:00.000Z",
+    "x-usage-ratelimit-session": "ent=1000&rem=70.0&rst=2026-06-24T16:00:00.000Z",
+    "x-usage-ratelimit-weekly": "ent=1000&rem=90.0&rst=2026-07-01T00:00:00.000Z",
+  });
+  assert.equal(result?.sessionPercent, 30);
+  assert.equal(result?.sessionLabel, "5h");
+  assert.equal(result?.weeklyPercent, 10);
+  assert.equal(result?.weeklyLabel, "7d");
+});
+
+test("copilot response headers fall back to quota snapshot when rate-limit absent", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotResponseHeaders({
+    "x-quota-snapshot-premium_interactions": "ent=1000&rem=25.0&rst=2026-07-01T00:00:00.000Z",
+  }), {
+    weeklyPercent: 75,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
+});
+
+test("copilot response headers return null when no recognizable headers present", () => {
+  assert.equal(parseCopilotResponseHeaders({ "content-type": "application/json" }), null);
+});
+
+test("copilot usage parser uses quota_reset_date_utc when available", () => {
+  const resetAt = new Date("2026-07-01T00:00:00.000Z").getTime();
+  assert.deepEqual(parseCopilotSubscriptionUsage({
+    quota_reset_date_utc: "2026-07-01T00:00:00.000Z",
+    quota_snapshots: {
+      premium_interactions: { entitlement: 1000, percent_remaining: 40, unlimited: true },
+    },
+  }), {
+    weeklyPercent: 60,
+    weeklyLabel: "30d",
+    weeklyResetAt: resetAt,
+  });
 });
