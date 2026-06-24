@@ -34,7 +34,7 @@ import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSession
 import { createWelcomeDismissScheduler } from "./welcome-dismiss.ts";
 import { createRenderScheduler } from "./render-scheduler.ts";
 import { readCoreContextUsage } from "./context-usage.ts";
-import { fetchProviderSubscriptionUsage, getSupportedSubscriptionProvider, type SubscriptionUsage } from "./subscription-usage.ts";
+import { fetchProviderSubscriptionUsage, getSupportedSubscriptionProvider, isSubscriptionUsageEnabled, type SubscriptionUsage } from "./subscription-usage.ts";
 import { renderFixedEditorCluster } from "./fixed-editor/cluster.ts";
 import { emergencyTerminalModeReset, TerminalSplitCompositor } from "./fixed-editor/terminal-split.ts";
 import { getDefaultColors } from "./theme.ts";
@@ -1071,7 +1071,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   const ensureSubscriptionUsage = (ctx: any) => {
     const model = ctx?.model;
     const provider = getSupportedSubscriptionProvider(model);
-    if (!provider || !(ctx?.modelRegistry?.isUsingOAuth?.(model) ?? false)) {
+    if (!isSubscriptionUsageEnabled(provider, ctx?.modelRegistry?.isUsingOAuth?.(model) ?? false)) {
       return;
     }
 
@@ -1996,15 +1996,16 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     const customItemsById = new Map(config.customItems.map((item) => [item.id, item]));
     const hiddenExtensionStatusKeys = collectHiddenExtensionStatusKeys(config.customItems);
 
-    // Check if using OAuth subscription
-    const usingSubscription = ctx.model
-      ? ctx.modelRegistry?.isUsingOAuth?.(ctx.model) ?? false
-      : false;
+    // Check if the selected provider has subscription limits available.
+    const subscriptionUsageProvider = getSupportedSubscriptionProvider(ctx.model);
+    const usingSubscription = isSubscriptionUsageEnabled(
+      subscriptionUsageProvider,
+      ctx.model ? ctx.modelRegistry?.isUsingOAuth?.(ctx.model) ?? false : false,
+    );
     if (usingSubscription) {
       ensureSubscriptionUsage(ctx);
     }
 
-    const subscriptionUsageProvider = getSupportedSubscriptionProvider(ctx.model);
     const subscriptionUsage = usingSubscription && subscriptionUsageProvider
       ? subscriptionUsageByProvider.get(subscriptionUsageProvider)?.usage ?? null
       : null;

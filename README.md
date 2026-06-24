@@ -20,12 +20,14 @@ coding agent.
   `ctx.model.provider`. No provider suffix is added when the model name already
   starts with `provider/`.
 
-- **Subscription quota windows in the footer.** When the active model is on an
-  OAuth/subscription plan, the `cost` segment shows live subscription usage
+- **Subscription quota windows in the footer.** When the active model has a
+  supported subscription usage source, the `cost` segment shows live usage
   windows instead of a bare `(sub)`. Supported providers: `anthropic`,
-  `openai-codex`, and `opencode-go`. Usage is fetched through the model
-  registry's auth, cached for 2 minutes (30s on error), and refreshed only while
-  streaming with an active subscription. Implemented in
+  `openai-codex`, and `opencode-go`. Anthropic/OpenAI usage is fetched through
+  model-registry auth. Opencode Go scrapes the dashboard and requires
+  `OPENCODE_GO_WORKSPACE_ID` plus `OPENCODE_GO_AUTH_COOKIE`; monthly usage is
+  intentionally ignored for now. Usage is cached for 2 minutes (30s on error)
+  and refreshed only while streaming with an active subscription. Implemented in
   `subscription-usage.ts`; the parsed usage is exposed to segments via
   `ctx.subscriptionUsage`.
 
