@@ -12,6 +12,7 @@ import { getPowerlineShortcutHelpEntries, parseBashModeSettings, resolveShortcut
 const source = readFileSync(new URL("../index.ts", import.meta.url), "utf-8");
 
 const powerlineShortcutKeys = new Set([
+  "showShortcuts",
   "stashHistory",
   "copyEditor",
   "cutEditor",
@@ -51,6 +52,7 @@ function powerlineDefaults(): Map<string, string> {
 
 test("chat jump shortcuts are configurable and route through fixed editor scrolling", () => {
   const defaults = powerlineDefaults();
+  assert.equal(defaults.get("showShortcuts"), "ctrl+shift+k");
   assert.equal(defaults.get("jumpPreviousUserMessage"), "ctrl+shift+u");
   assert.equal(defaults.get("jumpNextUserMessage"), "ctrl+shift+i");
   assert.equal(defaults.get("jumpPreviousLlmMessage"), "ctrl+alt+,");
@@ -95,6 +97,7 @@ test("chat jump shortcuts are configurable and route through fixed editor scroll
 
 test("powerline shortcut help lists active bindings and omits disabled bindings", () => {
   const entries = getPowerlineShortcutHelpEntries({
+    showShortcuts: null,
     stashHistory: null,
     copyEditor: "ctrl+alt+c",
     cutEditor: null,
@@ -110,11 +113,12 @@ test("powerline shortcut help lists active bindings and omits disabled bindings"
   }, "ctrl+shift+b");
 
   assert.deepEqual(entries, [
-    { label: "Stash or restore editor", shortcut: "alt+s" },
-    { label: "Toggle bash mode", shortcut: "ctrl+shift+b" },
-    { label: "Copy editor text", shortcut: "ctrl+alt+c" },
-    { label: "Scroll chat up", shortcut: "cmd+up" },
+    { key: "stash", label: "Stash or restore editor", shortcut: "alt+s" },
+    { key: "bashToggle", label: "Toggle bash mode", shortcut: "ctrl+shift+b" },
+    { key: "copyEditor", label: "Copy editor text", shortcut: "ctrl+alt+c" },
+    { key: "scrollChatUp", label: "Scroll chat up", shortcut: "cmd+up" },
   ]);
+  assert.match(source, /runPowerlineShortcutHelpEntry\(ctx, selected\.value as PowerlineShortcutHelpKey\)/);
   assert.match(source, /if \(normalizedArgs === "shortcuts"\)/);
   assert.match(source, /"Powerline shortcuts"/);
 });
@@ -246,6 +250,7 @@ test("powerline fallback routing rejects reserved Pi shortcut defaults", () => {
 test("powerline shortcuts support explicit disabled bindings", () => {
   const resolved = resolveShortcutConfig({
     powerlineShortcuts: {
+      showShortcuts: "",
       stashHistory: "",
       copyEditor: null,
       cutEditor: "ctrl+alt+x",
@@ -256,6 +261,7 @@ test("powerline shortcuts support explicit disabled bindings", () => {
   });
   const bashMode = parseBashModeSettings({ bashMode: { toggleShortcut: undefined } });
 
+  assert.equal(resolved.showShortcuts, null);
   assert.equal(resolved.stashHistory, null);
   assert.equal(resolved.copyEditor, null);
   assert.equal(resolved.cutEditor, "ctrl+alt+x");
@@ -266,6 +272,7 @@ test("powerline shortcuts support explicit disabled bindings", () => {
   assert.equal(bashMode.toggleShortcut, null);
   assert.equal(matchesConfiguredShortcut("\x1b\x07", resolved.jumpChatBottom), false);
   assert.equal(matchesConfiguredShortcut("\x1b[1;9A", resolved.scrollChatUp), false);
+  assert.equal(matchesConfiguredShortcut("\x1b\x0b", resolved.showShortcuts), false);
 });
 
 test("powerline shortcut resolver reserves the active bash-mode toggle", () => {
@@ -308,6 +315,7 @@ test("powerline shortcut resolver rejects active fixed-editor scroll aliases", (
 
 test("powerline shortcuts have terminal-input fallback routing", () => {
   assert.match(source, /function getPowerlineShortcutAction\(data: string\): PowerlineShortcutAction \| null/);
+  assert.match(source, /matchesConfiguredShortcut\(data, resolvedShortcuts\.showShortcuts\)/);
   assert.match(source, /matchesConfiguredShortcut\(data, resolvedShortcuts\.stashHistory\)/);
   assert.match(source, /matchesConfiguredShortcut\(data, resolvedShortcuts\.copyEditor\)/);
   assert.match(source, /matchesConfiguredShortcut\(data, resolvedShortcuts\.cutEditor\)/);
@@ -317,6 +325,13 @@ test("powerline shortcuts have terminal-input fallback routing", () => {
   assert.doesNotMatch(source, /function registerPowerlineShortcut\(/);
   assert.doesNotMatch(source, /pi\.registerShortcut\(resolvedShortcuts\./);
   assert.doesNotMatch(source, /pi\.registerShortcut\(bashModeSettings\.toggleShortcut/);
+  assert.equal(matchesConfiguredShortcut("\x1b\x0b", "ctrl+alt+k"), true);
+  assert.equal(matchesConfiguredShortcut("\x1b[107;7u", "ctrl+alt+k"), true);
+  assert.equal(matchesConfiguredShortcut("\x1b[27;7;107~", "ctrl+alt+k"), true);
+  assert.equal(matchesConfiguredShortcut("\x1b[107;6u", "ctrl+shift+k"), true);
+  assert.equal(matchesConfiguredShortcut("\x1b[107:75;6u", "ctrl+shift+k"), true);
+  assert.equal(matchesConfiguredShortcut("\x1b[27;6;107~", "ctrl+shift+k"), true);
+  assert.equal(matchesConfiguredShortcut("\x0b", "ctrl+shift+k"), false);
 });
 
 test("powerline editor preserves a previous editor autocomplete provider", () => {

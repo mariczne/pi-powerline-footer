@@ -689,6 +689,14 @@ export class TerminalSplitCompositor {
     return this.jumpToRootTarget(targetLines, "next");
   }
 
+  scrollRootBy(delta: number): boolean {
+    if (this.disposed || this.hasVisibleOverlay() || delta === 0) return false;
+
+    this.flushQueuedScroll();
+    this.scrollBy(delta);
+    return true;
+  }
+
   jumpToRootBottom(): boolean {
     if (this.disposed || this.hasVisibleOverlay()) return false;
 

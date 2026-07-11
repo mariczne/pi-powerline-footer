@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- **Powerline shortcut help** — `/powerline shortcuts` opens a modal listing the active Powerline bindings.
+- **Powerline shortcut help** — `/powerline shortcuts` or `ctrl+shift+k` opens a modal listing the active Powerline bindings. Selecting an entry with enter runs it, so the modal doubles as a quick command palette.
 - **Welcome toggle** — Added `powerline.welcome` so the startup welcome UI can be disabled without disabling the footer. Thanks to OCPdev25, miloslavnosek, vzeazy, and Florian Kinder (@fank) for #48/#89.
 - **Display options** — Added `powerline.cost.subscriptionDisplay` and `powerline.model.display` for subscription cost and provider-qualified model names. Thanks to Alexandr Burdiyan (@burdiyan), Meidhy (@dymayday), Mathu Mounasamy (@Mathuv), and pserey for #3/#83/#50.
 - **Legacy sharp-S stash opt-in** — Added `powerline.stashSharpSShortcut` for users who intentionally want printable `ß` to trigger stash. Thanks to SebastianRuettiRuettger and Filip (@filipores) for #39/#84.

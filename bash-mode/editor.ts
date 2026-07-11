@@ -347,7 +347,7 @@ export class BashModeEditor extends CustomEditor {
     return getOneOffBashCommandContext(this.getExpandedText()) !== null;
   }
 
-  private moveCursorToEditorBoundary(position: "start" | "end"): void {
+  moveCursorToEditorBoundary(position: "start" | "end"): void {
     const state = Reflect.get(this, "state");
     const lines = state && typeof state === "object" ? Reflect.get(state, "lines") : null;
     if (!Array.isArray(lines)) {

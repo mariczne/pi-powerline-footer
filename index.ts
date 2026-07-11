@@ -69,6 +69,7 @@ let customCompactionEnabled = false;
 type ShortcutBinding = string | null;
 
 export interface PowerlineShortcuts {
+  showShortcuts: ShortcutBinding;
   stashHistory: ShortcutBinding;
   copyEditor: ShortcutBinding;
   cutEditor: ShortcutBinding;
@@ -98,6 +99,7 @@ type ChatJumpShortcutAction =
   | { kind: "message"; role: ChatJumpRole; direction: ChatJumpDirection }
   | { kind: "bottom" };
 type PowerlineShortcutAction =
+  | { kind: "showShortcuts" }
   | { kind: "stashHistory" }
   | { kind: "copyEditor" }
   | { kind: "cutEditor" }
@@ -108,6 +110,7 @@ const STASH_HISTORY_LIMIT = 12;
 const PROJECT_PROMPT_HISTORY_LIMIT = 50;
 const STASH_PREVIEW_WIDTH = 72;
 const DEFAULT_SHORTCUTS: Record<PowerlineShortcutKey, string> = {
+  showShortcuts: "ctrl+shift+k",
   stashHistory: "ctrl+alt+h",
   copyEditor: "ctrl+alt+c",
   cutEditor: "ctrl+alt+x",
@@ -158,6 +161,7 @@ const CHAT_JUMP_SHORTCUTS: Array<{
   },
 ];
 const SHORTCUT_KEYS: PowerlineShortcutKey[] = [
+  "showShortcuts",
   "stashHistory",
   "copyEditor",
   "cutEditor",
@@ -696,6 +700,7 @@ function scrollAwayShortcutEntry(id: ScrollAwayShortcutId, shortcut: ShortcutBin
 }
 
 const POWERLINE_SHORTCUT_HELP: ReadonlyArray<{ key: PowerlineShortcutKey; label: string }> = [
+  { key: "showShortcuts", label: "Show Powerline shortcuts" },
   { key: "stashHistory", label: "Open prompt history" },
   { key: "copyEditor", label: "Copy editor text" },
   { key: "cutEditor", label: "Cut editor text" },
@@ -710,7 +715,10 @@ const POWERLINE_SHORTCUT_HELP: ReadonlyArray<{ key: PowerlineShortcutKey; label:
   { key: "editorEnd", label: "Move editor to end" },
 ];
 
+export type PowerlineShortcutHelpKey = PowerlineShortcutKey | "stash" | "bashToggle";
+
 export interface PowerlineShortcutHelpEntry {
+  key: PowerlineShortcutHelpKey;
   label: string;
   shortcut: string;
 }
@@ -720,18 +728,18 @@ export function getPowerlineShortcutHelpEntries(
   bashModeToggleShortcut: ShortcutBinding,
 ): PowerlineShortcutHelpEntry[] {
   const entries: PowerlineShortcutHelpEntry[] = [
-    { label: "Stash or restore editor", shortcut: "alt+s" },
+    { key: "stash", label: "Stash or restore editor", shortcut: "alt+s" },
   ];
 
   const bashToggleLabel = formatShortcutLabel(bashModeToggleShortcut);
   if (bashToggleLabel) {
-    entries.push({ label: "Toggle bash mode", shortcut: bashToggleLabel });
+    entries.push({ key: "bashToggle", label: "Toggle bash mode", shortcut: bashToggleLabel });
   }
 
   for (const { key, label } of POWERLINE_SHORTCUT_HELP) {
     const shortcut = formatShortcutLabel(shortcuts[key]);
     if (shortcut) {
-      entries.push({ label, shortcut });
+      entries.push({ key, label, shortcut });
     }
   }
 
@@ -1378,18 +1386,63 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   async function showPowerlineShortcutOverlay(ctx: any): Promise<void> {
     const entries = getPowerlineShortcutHelpEntries(resolvedShortcuts, bashModeSettings.toggleShortcut);
     const items: SelectItem[] = entries.map((entry) => ({
-      value: entry.label,
+      value: entry.key,
       label: entry.label,
       description: entry.shortcut,
     }));
 
-    await showSelectOverlay(
+    const selected = await showSelectOverlay(
       ctx,
       "Powerline shortcuts",
-      "↑↓ navigate • enter/esc close",
+      "↑↓ navigate • enter run • esc close",
       items,
       Math.min(items.length, 10),
     );
+    if (!selected) return;
+
+    runPowerlineShortcutHelpEntry(ctx, selected.value as PowerlineShortcutHelpKey);
+  }
+
+  function runPowerlineShortcutHelpEntry(ctx: any, key: PowerlineShortcutHelpKey): void {
+    switch (key) {
+      case "showShortcuts":
+        return;
+      case "stash":
+        stashOrRestoreEditorText(ctx);
+        return;
+      case "bashToggle":
+        runPowerlineShortcut(ctx, { kind: "bashMode" });
+        return;
+      case "stashHistory":
+      case "copyEditor":
+      case "cutEditor":
+        runPowerlineShortcut(ctx, { kind: key });
+        return;
+      case "scrollChatUp":
+      case "scrollChatDown": {
+        if (!fixedEditorCompositor) {
+          ctx.ui.notify("Chat scrolling requires /powerline fixed-editor on", "warning");
+          return;
+        }
+        fixedEditorCompositor.scrollRootBy(key === "scrollChatUp" ? 10 : -10);
+        return;
+      }
+      case "editorStart":
+      case "editorEnd": {
+        if (typeof currentEditor?.moveCursorToEditorBoundary !== "function") {
+          ctx.ui.notify("Editor cursor control is unavailable", "warning");
+          return;
+        }
+        currentEditor.moveCursorToEditorBoundary(key === "editorStart" ? "start" : "end");
+        return;
+      }
+      default: {
+        const chatJump = CHAT_JUMP_SHORTCUTS.find((entry) => entry.shortcutKey === key);
+        if (chatJump) {
+          runPowerlineShortcut(ctx, { kind: "chat", action: chatJump.action });
+        }
+      }
+    }
   }
 
   // Track session start
@@ -1748,6 +1801,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   function getPowerlineShortcutAction(data: string): PowerlineShortcutAction | null {
     if (isKeyRelease(data)) return null;
 
+    if (matchesConfiguredShortcut(data, resolvedShortcuts.showShortcuts)) {
+      return { kind: "showShortcuts" };
+    }
     if (isPromptHistoryShortcutInput(data)) {
       return { kind: "stashHistory" };
     }
@@ -1766,6 +1822,11 @@ export default function powerlineFooter(pi: ExtensionAPI) {
   }
 
   function runPowerlineShortcut(ctx: any, action: PowerlineShortcutAction): void {
+    if (action.kind === "showShortcuts") {
+      void showPowerlineShortcutOverlay(ctx);
+      return;
+    }
+
     if (action.kind === "stashHistory") {
       void openStashHistory(ctx);
       return;
