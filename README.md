@@ -40,10 +40,13 @@ coding agent.
   re-checks the extended keyboard mode on each scrollable-root render and pushes
   it once the mode resolves (`ensureAlternateScreenKeyboardMode`).
 
-- **Shortcut help without intrusive overlays.** `/powerline shortcuts` or
-  `ctrl+shift+k` opens a modal listing the active Powerline bindings; pressing
-  enter on an entry runs it, so the modal doubles as a quick command palette.
-  Configure or disable the key through `powerlineShortcuts.showShortcuts`. The fixed-editor
+- **Shortcut palette.** `/powerline shortcuts` or `ctrl+shift+k` opens a
+  searchable command palette listing the active Powerline bindings (prefixed
+  `Powerline: `) alongside all standard pi keybindings. Type to fuzzy-search,
+  press enter to run the highlighted action. Context-scoped bindings (editor
+  keys, tree view, session picker, model selector) are listed as searchable
+  reference entries. Configure or disable the key through
+  `powerlineShortcuts.showShortcuts`. The fixed-editor
   scroll-away navigation card is off by default; opt in with
   `/powerline scroll-away-card on` or `powerline.scrollAwayNavigationCard: true`.
 

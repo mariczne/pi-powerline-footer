@@ -7,7 +7,17 @@ import {
   matchesConfiguredShortcut,
   shortcutConflictKey,
 } from "../shortcuts.ts";
-import { getPowerlineShortcutHelpEntries, parseBashModeSettings, resolveShortcutConfig } from "../index.ts";
+import { KeybindingsManager } from "@earendil-works/pi-tui";
+import {
+  buildShortcutPaletteEntries,
+  collectPiKeybindingDefinitions,
+  getPowerlineShortcutHelpEntries,
+  isShortcutPaletteQueryInput,
+  parseBashModeSettings,
+  piShortcutGroupPrefix,
+  resolveShortcutConfig,
+  shortcutPaletteItemDescription,
+} from "../index.ts";
 
 const source = readFileSync(new URL("../index.ts", import.meta.url), "utf-8");
 
@@ -118,9 +128,90 @@ test("powerline shortcut help lists active bindings and omits disabled bindings"
     { key: "copyEditor", label: "Copy editor text", shortcut: "ctrl+alt+c" },
     { key: "scrollChatUp", label: "Scroll chat up", shortcut: "cmd+up" },
   ]);
-  assert.match(source, /runPowerlineShortcutHelpEntry\(ctx, selected\.value as PowerlineShortcutHelpKey\)/);
+  assert.match(source, /runShortcutPaletteEntry\(ctx, selected\)/);
   assert.match(source, /if \(normalizedArgs === "shortcuts"\)/);
-  assert.match(source, /"Powerline shortcuts"/);
+  assert.match(source, /theme\.bold\("Shortcuts"\)/);
+});
+
+test("shortcut palette merges powerline and pi bindings with search-friendly metadata", () => {
+  const powerlineEntries = getPowerlineShortcutHelpEntries(resolveShortcutConfig({}), "ctrl+shift+b");
+  const runnableIds = new Set(["app.model.select", "app.session.resume", "app.clipboard.pasteImage"]);
+
+  const manager = new KeybindingsManager(KEYBINDINGS, { "app.model.select": "ctrl+alt+m" });
+  const piKeybindings = collectPiKeybindingDefinitions(manager);
+  assert.deepEqual(collectPiKeybindingDefinitions(undefined), {});
+
+  const entries = buildShortcutPaletteEntries({
+    powerlineEntries,
+    piKeybindings,
+    isPiActionRunnable: (id) => runnableIds.has(id),
+  });
+
+  // Every powerline entry is present, prefixed, and runnable.
+  for (const entry of powerlineEntries) {
+    const paletteEntry = entries.find((candidate) => candidate.id === `powerline:${entry.key}`);
+    assert.ok(paletteEntry, `missing palette entry for powerline:${entry.key}`);
+    assert.equal(paletteEntry.label, `Powerline: ${entry.label}`);
+    assert.equal(paletteEntry.runnable, true);
+  }
+
+  // Every pi keybinding is present exactly once.
+  for (const id of Object.keys(KEYBINDINGS)) {
+    assert.equal(entries.filter((candidate) => candidate.id === `pi:${id}`).length, 1);
+  }
+
+  // Configured keys override defaults; unconfigured fall back to defaults.
+  const modelSelect = entries.find((entry) => entry.id === "pi:app.model.select");
+  assert.equal(modelSelect?.shortcut, "ctrl+alt+m");
+  assert.equal(modelSelect?.runnable, true);
+  const undo = entries.find((entry) => entry.id === "pi:tui.editor.undo");
+  assert.equal(undo?.shortcut, "ctrl+-");
+  assert.equal(undo?.runnable, false);
+
+  // Unbound-but-runnable app actions still appear as commands.
+  const resume = entries.find((entry) => entry.id === "pi:app.session.resume");
+  assert.equal(resume?.shortcut, "");
+  assert.equal(resume?.runnable, true);
+
+  // Runnable entries are listed before reference-only entries.
+  const lastRunnable = entries.reduce((last, entry, index) => (entry.runnable ? index : last), -1);
+  const firstReference = entries.findIndex((entry) => !entry.runnable);
+  assert.ok(lastRunnable < firstReference || firstReference === -1);
+
+  // Context-scoped bindings get group prefixes.
+  assert.equal(piShortcutGroupPrefix("tui.editor.undo"), "Editor: ");
+  assert.equal(piShortcutGroupPrefix("tui.select.confirm"), "Lists: ");
+  assert.equal(piShortcutGroupPrefix("app.tree.filter.all"), "Tree view: ");
+  assert.equal(piShortcutGroupPrefix("app.models.save"), "Model selector: ");
+  assert.equal(piShortcutGroupPrefix("app.session.delete"), "Session picker: ");
+  assert.equal(piShortcutGroupPrefix("app.model.select"), "");
+
+  // Reference-only entries are marked in the description column.
+  assert.equal(
+    shortcutPaletteItemDescription({ id: "pi:tui.editor.undo", label: "Editor: Undo", shortcut: "ctrl+-", runnable: false }),
+    "ctrl+- · reference",
+  );
+  assert.equal(
+    shortcutPaletteItemDescription({ id: "pi:app.session.resume", label: "Resume a session", shortcut: "", runnable: true }),
+    undefined,
+  );
+
+  // Dangerous or palette-redundant actions never run from the palette.
+  assert.match(source, /PI_PALETTE_RUN_EXCLUDED = new Set\(\["app\.interrupt", "app\.exit", "app\.clear"\]\)/);
+  // App actions execute through the handlers pi copies onto the custom editor.
+  assert.match(source, /const handlers = currentEditor\?\.actionHandlers/);
+  assert.match(source, /handlers instanceof Map \? handlers\.get\(actionId\) : undefined/);
+});
+
+test("shortcut palette query input accepts printable text and rejects control sequences", () => {
+  assert.equal(isShortcutPaletteQueryInput("a"), true);
+  assert.equal(isShortcutPaletteQueryInput("model select"), true);
+  assert.equal(isShortcutPaletteQueryInput("ß"), true);
+  assert.equal(isShortcutPaletteQueryInput(""), false);
+  assert.equal(isShortcutPaletteQueryInput("\x1b[A"), false);
+  assert.equal(isShortcutPaletteQueryInput("\x0b"), false);
+  assert.equal(isShortcutPaletteQueryInput("\x7f"), false);
+  assert.equal(isShortcutPaletteQueryInput("\x1bs"), false);
 });
 
 test("super shortcut matching rejects plain keys and unsupported command aliases", () => {

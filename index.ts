@@ -5,7 +5,7 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { isKeyRelease, type AutocompleteProvider, type SelectItem, SelectList, truncateToWidth, TUI_KEYBINDINGS, visibleWidth } from "@earendil-works/pi-tui";
+import { fuzzyFilter, isKeyRelease, matchesKey, type AutocompleteProvider, type SelectItem, SelectList, truncateToWidth, TUI_KEYBINDINGS, visibleWidth } from "@earendil-works/pi-tui";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
@@ -746,6 +746,110 @@ export function getPowerlineShortcutHelpEntries(
   return entries;
 }
 
+export interface ShortcutPaletteEntry {
+  id: string;
+  label: string;
+  shortcut: string;
+  runnable: boolean;
+}
+
+const SESSION_PICKER_KEYBINDING_IDS = new Set([
+  "app.session.togglePath",
+  "app.session.toggleSort",
+  "app.session.toggleNamedFilter",
+  "app.session.rename",
+  "app.session.delete",
+  "app.session.deleteNoninvasive",
+]);
+
+const PI_PALETTE_RUN_EXCLUDED = new Set(["app.interrupt", "app.exit", "app.clear"]);
+
+export function piShortcutGroupPrefix(id: string): string {
+  if (id.startsWith("tui.select.")) return "Lists: ";
+  if (id.startsWith("tui.")) return "Editor: ";
+  if (id.startsWith("app.tree.")) return "Tree view: ";
+  if (id.startsWith("app.models.")) return "Model selector: ";
+  return SESSION_PICKER_KEYBINDING_IDS.has(id) ? "Session picker: " : "";
+}
+
+export interface PiKeybindingDefinition {
+  keys: string[];
+  description?: string;
+}
+
+export function collectPiKeybindingDefinitions(keybindings: any): Record<string, PiKeybindingDefinition> {
+  if (
+    typeof keybindings?.getResolvedBindings !== "function"
+    || typeof keybindings?.getDefinition !== "function"
+    || typeof keybindings?.getKeys !== "function"
+  ) {
+    return {};
+  }
+
+  const definitions: Record<string, PiKeybindingDefinition> = {};
+  for (const id of Object.keys(keybindings.getResolvedBindings())) {
+    let description: string | undefined;
+    try {
+      description = keybindings.getDefinition(id)?.description;
+    } catch {
+      description = undefined;
+    }
+
+    let keys: string[] = [];
+    try {
+      const resolved = keybindings.getKeys(id);
+      keys = Array.isArray(resolved) ? resolved : [];
+    } catch {
+      keys = [];
+    }
+
+    definitions[id] = { keys, description };
+  }
+
+  return definitions;
+}
+
+export function buildShortcutPaletteEntries(options: {
+  powerlineEntries: PowerlineShortcutHelpEntry[];
+  piKeybindings: Record<string, PiKeybindingDefinition>;
+  isPiActionRunnable: (id: string) => boolean;
+}): ShortcutPaletteEntry[] {
+  const entries: ShortcutPaletteEntry[] = options.powerlineEntries.map((entry) => ({
+    id: `powerline:${entry.key}`,
+    label: `Powerline: ${entry.label}`,
+    shortcut: entry.shortcut,
+    runnable: true,
+  }));
+
+  const referenceEntries: ShortcutPaletteEntry[] = [];
+  for (const [id, definition] of Object.entries(options.piKeybindings)) {
+    const entry: ShortcutPaletteEntry = {
+      id: `pi:${id}`,
+      label: `${piShortcutGroupPrefix(id)}${definition.description ?? id}`,
+      shortcut: definition.keys.filter(Boolean).join(", "),
+      runnable: options.isPiActionRunnable(id),
+    };
+    (entry.runnable ? entries : referenceEntries).push(entry);
+  }
+
+  return [...entries, ...referenceEntries];
+}
+
+export function shortcutPaletteItemDescription(entry: ShortcutPaletteEntry): string | undefined {
+  if (entry.runnable) return entry.shortcut || undefined;
+  return entry.shortcut ? `${entry.shortcut} · reference` : "reference";
+}
+
+export function isShortcutPaletteQueryInput(data: string): boolean {
+  if (!data) return false;
+
+  for (const ch of data) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code < 32 || code === 127) return false;
+  }
+  return true;
+}
+
 function reservedShortcuts(): Set<string> {
   const shortcuts = new Set<string>([
     ...EXTRA_RESERVED_SHORTCUTS,
@@ -1383,24 +1487,131 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     );
   }
 
-  async function showPowerlineShortcutOverlay(ctx: any): Promise<void> {
-    const entries = getPowerlineShortcutHelpEntries(resolvedShortcuts, bashModeSettings.toggleShortcut);
-    const items: SelectItem[] = entries.map((entry) => ({
-      value: entry.key,
-      label: entry.label,
-      description: entry.shortcut,
-    }));
+  function isPiActionRunnable(id: string): boolean {
+    if (PI_PALETTE_RUN_EXCLUDED.has(id)) return false;
+    if (id === "app.clipboard.pasteImage") return typeof currentEditor?.onPasteImage === "function";
 
-    const selected = await showSelectOverlay(
-      ctx,
-      "Powerline shortcuts",
-      "↑↓ navigate • enter run • esc close",
-      items,
-      Math.min(items.length, 10),
+    const handlers = currentEditor?.actionHandlers;
+    return handlers instanceof Map && typeof handlers.get(id) === "function";
+  }
+
+  async function showShortcutPalette(ctx: any): Promise<void> {
+    const selected = await ctx.ui.custom<ShortcutPaletteEntry | null>(
+      (tui: any, theme: Theme, keybindings: any, done: (result: ShortcutPaletteEntry | null) => void) => {
+        const entries = buildShortcutPaletteEntries({
+          powerlineEntries: getPowerlineShortcutHelpEntries(resolvedShortcuts, bashModeSettings.toggleShortcut),
+          piKeybindings: collectPiKeybindingDefinitions(keybindings),
+          isPiActionRunnable,
+        });
+        const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+
+        let query = "";
+        let selectList!: SelectList;
+
+        const rebuildList = () => {
+          const matched = query
+            ? fuzzyFilter(entries, query, (entry) => `${entry.label} ${entry.shortcut}`)
+            : entries;
+          // Keep runnable commands ahead of reference-only entries, preserving fuzzy rank within each group.
+          const filtered = [...matched.filter((entry) => entry.runnable), ...matched.filter((entry) => !entry.runnable)];
+          const items: SelectItem[] = filtered.map((entry) => ({
+            value: entry.id,
+            label: entry.label,
+            description: shortcutPaletteItemDescription(entry),
+          }));
+          selectList = new SelectList(items, Math.min(Math.max(items.length, 1), 10), overlaySelectListTheme(theme));
+          selectList.onSelect = (item) => done(entriesById.get(item.value) ?? null);
+          selectList.onCancel = () => done(null);
+        };
+        rebuildList();
+
+        const border = (text: string) => theme.fg("dim", text);
+        const wrapRow = (text: string, innerWidth: number): string => {
+          return `${border("│")}${truncateToWidth(text, innerWidth, "…", true)}${border("│")}`;
+        };
+
+        return {
+          render: (width: number) => {
+            const innerWidth = Math.max(1, width - 2);
+            const lines: string[] = [];
+
+            lines.push(border(`╭${"─".repeat(innerWidth)}╮`));
+            lines.push(wrapRow(theme.fg("accent", theme.bold("Shortcuts")), innerWidth));
+            lines.push(wrapRow(`${theme.fg("accent", "❯ ")}${query}${theme.fg("dim", "█")}`, innerWidth));
+            lines.push(border(`├${"─".repeat(innerWidth)}┤`));
+
+            for (const line of selectList.render(innerWidth)) {
+              lines.push(wrapRow(line, innerWidth));
+            }
+
+            lines.push(border(`├${"─".repeat(innerWidth)}┤`));
+            lines.push(wrapRow(theme.fg("dim", "type to search • ↑↓ navigate • enter run • esc close"), innerWidth));
+            lines.push(border(`╰${"─".repeat(innerWidth)}╯`));
+
+            return lines;
+          },
+          invalidate: () => selectList.invalidate(),
+          handleInput: (data: string) => {
+            if (isKeyRelease(data)) return;
+
+            if (matchesKey(data, "backspace")) {
+              if (query.length > 0) {
+                query = query.slice(0, -1);
+                rebuildList();
+              }
+            } else if (matchesKey(data, "ctrl+u")) {
+              if (query.length > 0) {
+                query = "";
+                rebuildList();
+              }
+            } else if (isShortcutPaletteQueryInput(data)) {
+              query += data;
+              rebuildList();
+            } else {
+              selectList.handleInput(data);
+            }
+            tui.requestRender();
+          },
+        };
+      },
+      {
+        overlay: true,
+        overlayOptions: () => ({
+          verticalAlign: "center",
+          horizontalAlign: "center",
+        }),
+      },
     );
     if (!selected) return;
 
-    runPowerlineShortcutHelpEntry(ctx, selected.value as PowerlineShortcutHelpKey);
+    runShortcutPaletteEntry(ctx, selected);
+  }
+
+  function runShortcutPaletteEntry(ctx: any, entry: ShortcutPaletteEntry): void {
+    if (entry.id.startsWith("powerline:")) {
+      runPowerlineShortcutHelpEntry(ctx, entry.id.slice("powerline:".length) as PowerlineShortcutHelpKey);
+      return;
+    }
+
+    if (!entry.runnable) {
+      ctx.ui.notify("Reference only — use this key directly in its context", "info");
+      return;
+    }
+
+    const actionId = entry.id.slice("pi:".length);
+    if (actionId === "app.clipboard.pasteImage") {
+      currentEditor?.onPasteImage?.();
+      return;
+    }
+
+    const handlers = currentEditor?.actionHandlers;
+    const handler = handlers instanceof Map ? handlers.get(actionId) : undefined;
+    if (typeof handler === "function") {
+      handler();
+      return;
+    }
+
+    ctx.ui.notify("This action is unavailable right now", "warning");
   }
 
   function runPowerlineShortcutHelpEntry(ctx: any, key: PowerlineShortcutHelpKey): void {
@@ -1823,7 +2034,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   function runPowerlineShortcut(ctx: any, action: PowerlineShortcutAction): void {
     if (action.kind === "showShortcuts") {
-      void showPowerlineShortcutOverlay(ctx);
+      void showShortcutPalette(ctx);
       return;
     }
 
@@ -1998,7 +2209,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       const normalizedArgs = args.trim().toLowerCase();
       if (normalizedArgs === "shortcuts") {
         if (ctx.hasUI) {
-          await showPowerlineShortcutOverlay(ctx);
+          await showShortcutPalette(ctx);
         }
         return;
       }
