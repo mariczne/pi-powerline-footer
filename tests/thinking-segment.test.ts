@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { getThinkingText } from "../icons.ts";
 import { renderSegment } from "../segments.ts";
 import type { ColorScheme, SegmentContext, ThemeLike } from "../types.ts";
 
@@ -9,6 +10,10 @@ function hexAnsi(hex: `#${string}`): string {
   const g = parseInt(value.slice(2, 4), 16);
   const b = parseInt(value.slice(4, 6), 16);
   return `\x1b[38;2;${r};${g};${b}m`;
+}
+
+function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 function createSegmentContext(thinkingLevel: string, colors: ColorScheme): SegmentContext {
@@ -42,21 +47,36 @@ function createSegmentContext(thinkingLevel: string, colors: ColorScheme): Segme
   };
 }
 
-test("thinking segment uses per-level colors for off through medium", () => {
+test("thinking segment uses normal per-level colors through high", () => {
   const colors: ColorScheme = {
     thinking: "#111111",
     thinkingMinimal: "#222222",
     thinkingLow: "#333333",
     thinkingMedium: "#444444",
+    thinkingHigh: "#555555",
   };
 
   const off = renderSegment("thinking", createSegmentContext("off", colors));
   const minimal = renderSegment("thinking", createSegmentContext("minimal", colors));
   const low = renderSegment("thinking", createSegmentContext("low", colors));
   const medium = renderSegment("thinking", createSegmentContext("medium", colors));
+  const high = renderSegment("thinking", createSegmentContext("high", colors));
 
   assert.equal(off.content, `${hexAnsi("#111111")}think:off\x1b[0m`);
   assert.equal(minimal.content, `${hexAnsi("#222222")}think:min\x1b[0m`);
   assert.equal(low.content, `${hexAnsi("#333333")}think:low\x1b[0m`);
   assert.equal(medium.content, `${hexAnsi("#444444")}think:med\x1b[0m`);
+  assert.equal(high.content, `${hexAnsi("#555555")}think:high\x1b[0m`);
+});
+
+test("thinking segment reserves rainbow for xhigh and max", () => {
+  const colors: ColorScheme = { thinkingHigh: "#555555" };
+  const xhigh = renderSegment("thinking", createSegmentContext("xhigh", colors));
+  const max = renderSegment("thinking", createSegmentContext("max", colors));
+
+  assert.match(xhigh.content, /^\x1b\[38;2;/);
+  assert.match(max.content, /^\x1b\[38;2;/);
+  assert.equal(stripAnsi(xhigh.content), "think:xhigh");
+  assert.equal(stripAnsi(max.content), "think:max");
+  assert.ok(getThinkingText("max")?.includes("max"));
 });

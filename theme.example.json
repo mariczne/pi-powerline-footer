@@ -9,6 +9,7 @@
     "thinkingMinimal": "thinkingMinimal",
     "thinkingLow": "thinkingLow",
     "thinkingMedium": "thinkingMedium",
+    "thinkingHigh": "thinkingHigh",
     "context": "dim",
     "contextWarn": "warning",
     "contextError": "error",

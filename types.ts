@@ -16,6 +16,7 @@ export type SemanticColor =
   | "thinkingMinimal"
   | "thinkingLow"
   | "thinkingMedium"
+  | "thinkingHigh"
   | "context"
   | "contextWarn"
   | "contextError"

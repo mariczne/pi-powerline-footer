@@ -29,6 +29,7 @@ const DEFAULT_COLORS: Required<ColorScheme> = {
   thinkingMinimal: "thinkingMinimal",
   thinkingLow: "thinkingLow",
   thinkingMedium: "thinkingMedium",
+  thinkingHigh: "thinkingHigh",
   context: "dim",
   contextWarn: "warning",
   contextError: "error",
@@ -38,7 +39,7 @@ const DEFAULT_COLORS: Required<ColorScheme> = {
   border: "borderMuted",
 };
 
-// Rainbow colors for high thinking levels
+// Rainbow colors for extreme thinking levels
 const RAINBOW_COLORS = [
   "#b281d6", "#d787af", "#febc38", "#e4c00f", 
   "#89d281", "#00afaf", "#178fb9", "#b281d6",
@@ -203,7 +204,7 @@ export function fg(
 }
 
 /**
- * Apply rainbow gradient to text (for high thinking levels)
+ * Apply rainbow gradient to text (for xhigh and max thinking levels)
  */
 export function rainbow(text: string): string {
   let result = "";
