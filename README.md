@@ -40,6 +40,11 @@ coding agent.
   re-checks the extended keyboard mode on each scrollable-root render and pushes
   it once the mode resolves (`ensureAlternateScreenKeyboardMode`).
 
+- **Shortcut help without intrusive overlays.** `/powerline shortcuts` opens a
+  modal listing the active Powerline bindings. The fixed-editor scroll-away
+  navigation card is off by default; opt in with
+  `/powerline scroll-away-card on` or `powerline.scrollAwayNavigationCard: true`.
+
 ### Removed
 
 - **Working Vibes.** The `/vibe` command, the `working-vibes.ts` module, its

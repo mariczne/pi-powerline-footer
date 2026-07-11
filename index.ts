@@ -58,6 +58,7 @@ let config: PowerlineConfig = {
   customItems: [],
   mouseScroll: true,
   fixedEditor: true,
+  scrollAwayNavigationCard: false,
   welcome: true,
   stashSharpSShortcut: false,
 };
@@ -625,7 +626,7 @@ function writePowerlinePresetSetting(preset: StatusLinePreset, cwd: string = pro
 
 function writePowerlineOptionSetting(
   cwd: string,
-  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "welcome" | "stashSharpSShortcut">>,
+  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "scrollAwayNavigationCard" | "welcome" | "stashSharpSShortcut">>,
   currentPreset: StatusLinePreset,
 ): boolean {
   return writePowerlineSetting(cwd, (existingPowerlineSetting) => (
@@ -692,6 +693,49 @@ function formatShortcutLabel(shortcut: ShortcutBinding): string | null {
 function scrollAwayShortcutEntry(id: ScrollAwayShortcutId, shortcut: ShortcutBinding): { id: ScrollAwayShortcutId; shortcutLabel: string } | null {
   const shortcutLabel = formatShortcutLabel(shortcut);
   return shortcutLabel ? { id, shortcutLabel } : null;
+}
+
+const POWERLINE_SHORTCUT_HELP: ReadonlyArray<{ key: PowerlineShortcutKey; label: string }> = [
+  { key: "stashHistory", label: "Open prompt history" },
+  { key: "copyEditor", label: "Copy editor text" },
+  { key: "cutEditor", label: "Cut editor text" },
+  { key: "scrollChatUp", label: "Scroll chat up" },
+  { key: "scrollChatDown", label: "Scroll chat down" },
+  { key: "jumpPreviousUserMessage", label: "Previous user message" },
+  { key: "jumpNextUserMessage", label: "Next user message" },
+  { key: "jumpPreviousLlmMessage", label: "Previous assistant response" },
+  { key: "jumpNextLlmMessage", label: "Next assistant response" },
+  { key: "jumpChatBottom", label: "Jump chat to bottom" },
+  { key: "editorStart", label: "Move editor to start" },
+  { key: "editorEnd", label: "Move editor to end" },
+];
+
+export interface PowerlineShortcutHelpEntry {
+  label: string;
+  shortcut: string;
+}
+
+export function getPowerlineShortcutHelpEntries(
+  shortcuts: PowerlineShortcuts,
+  bashModeToggleShortcut: ShortcutBinding,
+): PowerlineShortcutHelpEntry[] {
+  const entries: PowerlineShortcutHelpEntry[] = [
+    { label: "Stash or restore editor", shortcut: "alt+s" },
+  ];
+
+  const bashToggleLabel = formatShortcutLabel(bashModeToggleShortcut);
+  if (bashToggleLabel) {
+    entries.push({ label: "Toggle bash mode", shortcut: bashToggleLabel });
+  }
+
+  for (const { key, label } of POWERLINE_SHORTCUT_HELP) {
+    const shortcut = formatShortcutLabel(shortcuts[key]);
+    if (shortcut) {
+      entries.push({ label, shortcut });
+    }
+  }
+
+  return entries;
 }
 
 function reservedShortcuts(): Set<string> {
@@ -1331,6 +1375,23 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     );
   }
 
+  async function showPowerlineShortcutOverlay(ctx: any): Promise<void> {
+    const entries = getPowerlineShortcutHelpEntries(resolvedShortcuts, bashModeSettings.toggleShortcut);
+    const items: SelectItem[] = entries.map((entry) => ({
+      value: entry.label,
+      label: entry.label,
+      description: entry.shortcut,
+    }));
+
+    await showSelectOverlay(
+      ctx,
+      "Powerline shortcuts",
+      "↑↓ navigate • enter/esc close",
+      items,
+      Math.min(items.length, 10),
+    );
+  }
+
   // Track session start
   pi.on("session_start", async (event, ctx) => {
     shellSession?.dispose();
@@ -1825,7 +1886,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
   // Command to toggle/configure
   pi.registerCommand("powerline", {
-    description: "Configure powerline status (toggle, preset)",
+    description: "Configure powerline status, fixed editor, and shortcuts",
     handler: async (args, ctx) => {
       // Update context reference (command ctx may have more methods)
       currentCtx = ctx;
@@ -1874,6 +1935,29 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       }
 
       const normalizedArgs = args.trim().toLowerCase();
+      if (normalizedArgs === "shortcuts") {
+        if (ctx.hasUI) {
+          await showPowerlineShortcutOverlay(ctx);
+        }
+        return;
+      }
+
+      const scrollAwayCardMatch = /^scroll-away-card(?:\s+(on|off|toggle))?$/.exec(normalizedArgs);
+      if (scrollAwayCardMatch) {
+        const mode = scrollAwayCardMatch[1] ?? "toggle";
+        config.scrollAwayNavigationCard = mode === "toggle" ? !config.scrollAwayNavigationCard : mode === "on";
+        if (enabled && ctx.hasUI && config.fixedEditor && tuiRef && currentEditor) {
+          installFixedEditorCompositor(ctx, tuiRef);
+        }
+
+        if (writePowerlineOptionSetting(ctx.cwd, { scrollAwayNavigationCard: config.scrollAwayNavigationCard }, config.preset)) {
+          ctx.ui.notify(`Powerline scroll-away card ${config.scrollAwayNavigationCard ? "enabled" : "disabled"}`, "info");
+        } else {
+          ctx.ui.notify(`Powerline scroll-away card ${config.scrollAwayNavigationCard ? "enabled" : "disabled"} (not persisted; check settings.json)`, "warning");
+        }
+        return;
+      }
+
       const mouseScrollMatch = /^mouse-scroll(?:\s+(on|off|toggle))?$/.exec(normalizedArgs);
       if (mouseScrollMatch) {
         const mode = mouseScrollMatch[1] ?? "toggle";
@@ -2269,6 +2353,19 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       }
     };
 
+    const scrollAwayNavigationCard = config.scrollAwayNavigationCard
+      ? {
+        shortcuts: [
+          scrollAwayShortcutEntry("bottom", resolvedShortcuts.jumpChatBottom),
+          scrollAwayShortcutEntry("previousUser", resolvedShortcuts.jumpPreviousUserMessage),
+          scrollAwayShortcutEntry("nextUser", resolvedShortcuts.jumpNextUserMessage),
+          scrollAwayShortcutEntry("previousAssistant", resolvedShortcuts.jumpPreviousLlmMessage),
+          scrollAwayShortcutEntry("nextAssistant", resolvedShortcuts.jumpNextLlmMessage),
+        ].filter((shortcut): shortcut is { id: ScrollAwayShortcutId; shortcutLabel: string } => shortcut !== null),
+        onClickBottom: resolvedShortcuts.jumpChatBottom ? () => jumpChatToBottom(ctx) : undefined,
+      }
+      : undefined;
+
     let compositor: TerminalSplitCompositor;
     compositor = new TerminalSplitCompositor({
       tui,
@@ -2279,16 +2376,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         down: resolvedShortcuts.scrollChatDown,
       },
       scrollRepaintThrottleMs: DEFAULT_SCROLL_REPAINT_THROTTLE_MS,
-      scrollAwayNavigationCard: {
-        shortcuts: [
-          scrollAwayShortcutEntry("bottom", resolvedShortcuts.jumpChatBottom),
-          scrollAwayShortcutEntry("previousUser", resolvedShortcuts.jumpPreviousUserMessage),
-          scrollAwayShortcutEntry("nextUser", resolvedShortcuts.jumpNextUserMessage),
-          scrollAwayShortcutEntry("previousAssistant", resolvedShortcuts.jumpPreviousLlmMessage),
-          scrollAwayShortcutEntry("nextAssistant", resolvedShortcuts.jumpNextLlmMessage),
-        ].filter((shortcut): shortcut is { id: ScrollAwayShortcutId; shortcutLabel: string } => shortcut !== null),
-        onClickBottom: resolvedShortcuts.jumpChatBottom ? () => jumpChatToBottom(ctx) : undefined,
-      },
+      scrollAwayNavigationCard,
       onCopySelection: (text) => copyTextToClipboard(ctx, text),
       getShowHardwareCursor: () => typeof tui.getShowHardwareCursor === "function" && tui.getShowHardwareCursor(),
       renderCluster: (width, terminalRows) => {

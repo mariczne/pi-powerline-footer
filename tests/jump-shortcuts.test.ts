@@ -7,7 +7,7 @@ import {
   matchesConfiguredShortcut,
   shortcutConflictKey,
 } from "../shortcuts.ts";
-import { parseBashModeSettings, resolveShortcutConfig } from "../index.ts";
+import { getPowerlineShortcutHelpEntries, parseBashModeSettings, resolveShortcutConfig } from "../index.ts";
 
 const source = readFileSync(new URL("../index.ts", import.meta.url), "utf-8");
 
@@ -79,7 +79,9 @@ test("chat jump shortcuts are configurable and route through fixed editor scroll
   assert.match(source, /let resolvedShortcuts = resolveShortcutConfig\(startupSettings\)/);
   assert.match(source, /resolvedShortcuts = resolveShortcutConfig\(settings\)/);
   assert.match(source, /keyboardScrollShortcuts: \{\n\s+up: resolvedShortcuts\.scrollChatUp,\n\s+down: resolvedShortcuts\.scrollChatDown,/);
-  assert.match(source, /scrollAwayNavigationCard: \{/);
+  assert.match(source, /const scrollAwayNavigationCard = config\.scrollAwayNavigationCard/);
+  assert.match(source, /scrollAwayCardMatch = \/\^scroll-away-card/);
+  assert.match(source, /scrollAwayNavigationCard,/);
   assert.match(source, /shortcuts: \[/);
   assert.match(source, /scrollAwayShortcutEntry\("bottom", resolvedShortcuts\.jumpChatBottom\)/);
   assert.match(source, /onClickBottom: resolvedShortcuts\.jumpChatBottom \? \(\) => jumpChatToBottom\(ctx\) : undefined/);
@@ -89,6 +91,32 @@ test("chat jump shortcuts are configurable and route through fixed editor scroll
   assert.match(source, /modifier === "cmd" \|\| modifier === "command" \? "super" : modifier/);
   assert.match(source, /shortcutUsesSuper\(normalizedShortcut\) && !isSupportedSuperShortcut\(normalizedShortcut\)/);
   assert.match(source, /jumpToChatMessage\(ctx, action\.action\.role, action\.action\.direction\)/);
+});
+
+test("powerline shortcut help lists active bindings and omits disabled bindings", () => {
+  const entries = getPowerlineShortcutHelpEntries({
+    stashHistory: null,
+    copyEditor: "ctrl+alt+c",
+    cutEditor: null,
+    jumpPreviousUserMessage: null,
+    jumpNextUserMessage: null,
+    jumpPreviousLlmMessage: null,
+    jumpNextLlmMessage: null,
+    jumpChatBottom: null,
+    scrollChatUp: "super+up",
+    scrollChatDown: null,
+    editorStart: null,
+    editorEnd: null,
+  }, "ctrl+shift+b");
+
+  assert.deepEqual(entries, [
+    { label: "Stash or restore editor", shortcut: "alt+s" },
+    { label: "Toggle bash mode", shortcut: "ctrl+shift+b" },
+    { label: "Copy editor text", shortcut: "ctrl+alt+c" },
+    { label: "Scroll chat up", shortcut: "cmd+up" },
+  ]);
+  assert.match(source, /if \(normalizedArgs === "shortcuts"\)/);
+  assert.match(source, /"Powerline shortcuts"/);
 });
 
 test("super shortcut matching rejects plain keys and unsupported command aliases", () => {

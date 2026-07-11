@@ -7,6 +7,7 @@ export interface PowerlineConfig {
   segmentOptions: StatusLineSegmentOptions;
   mouseScroll: boolean;
   fixedEditor: boolean;
+  scrollAwayNavigationCard: boolean;
   welcome: boolean;
   stashSharpSShortcut: boolean;
 }
@@ -157,6 +158,7 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
     segmentOptions: {},
     mouseScroll: true,
     fixedEditor: true,
+    scrollAwayNavigationCard: false,
     welcome: true,
     stashSharpSShortcut: false,
   };
@@ -172,6 +174,7 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
     segmentOptions: normalizeSegmentOptions(value),
     mouseScroll: value.mouseScroll !== false,
     fixedEditor: value.fixedEditor !== false,
+    scrollAwayNavigationCard: value.scrollAwayNavigationCard === true,
     welcome: value.welcome !== false,
     stashSharpSShortcut: value.stashSharpSShortcut === true,
   };
@@ -205,7 +208,7 @@ export function nextPowerlineSettingWithPreset(existingPowerlineSetting: unknown
 
 export function nextPowerlineSettingWithOptions(
   existingPowerlineSetting: unknown,
-  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "welcome" | "stashSharpSShortcut">>,
+  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "scrollAwayNavigationCard" | "welcome" | "stashSharpSShortcut">>,
   currentPreset: StatusLinePreset,
 ): unknown {
   if (!isRecord(existingPowerlineSetting)) {

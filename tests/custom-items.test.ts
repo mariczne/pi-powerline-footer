@@ -22,6 +22,7 @@ test("parsePowerlineConfig supports object config with custom items", () => {
   assert.equal(config.customItems[1].hideWhenMissing, false);
   assert.equal(config.mouseScroll, true);
   assert.equal(config.fixedEditor, true);
+  assert.equal(config.scrollAwayNavigationCard, false);
   assert.equal(config.welcome, true);
   assert.equal(config.stashSharpSShortcut, false);
 });
@@ -46,17 +47,19 @@ test("parsePowerlineConfig supports disabling fixed editor", () => {
   assert.equal(config.fixedEditor, false);
 });
 
-test("parsePowerlineConfig supports welcome and legacy sharp-S toggles", () => {
-  const disabled = parsePowerlineConfig(
-    { preset: "compact", welcome: false, stashSharpSShortcut: true },
+test("parsePowerlineConfig supports welcome, shortcut, and navigation-card toggles", () => {
+  const configured = parsePowerlineConfig(
+    { preset: "compact", welcome: false, stashSharpSShortcut: true, scrollAwayNavigationCard: true },
     ["default", "compact"],
   );
   const shorthand = parsePowerlineConfig("compact", ["default", "compact"]);
 
-  assert.equal(disabled.welcome, false);
-  assert.equal(disabled.stashSharpSShortcut, true);
+  assert.equal(configured.welcome, false);
+  assert.equal(configured.stashSharpSShortcut, true);
+  assert.equal(configured.scrollAwayNavigationCard, true);
   assert.equal(shorthand.welcome, true);
   assert.equal(shorthand.stashSharpSShortcut, false);
+  assert.equal(shorthand.scrollAwayNavigationCard, false);
 });
 
 test("parsePowerlineConfig extracts supported segment options", () => {
@@ -136,7 +139,7 @@ test("nextPowerlineSettingWithPreset preserves object settings", () => {
 test("nextPowerlineSettingWithOptions preserves object settings", () => {
   const updated = nextPowerlineSettingWithOptions(
     { preset: "default", customItems: [{ id: "ci" }], mouseScroll: false },
-    { fixedEditor: false },
+    { fixedEditor: false, scrollAwayNavigationCard: true },
     "compact",
   );
   if (typeof updated !== "object" || updated === null || Array.isArray(updated)) {
@@ -145,6 +148,7 @@ test("nextPowerlineSettingWithOptions preserves object settings", () => {
 
   assert.equal(updated.preset, "default");
   assert.equal(updated.fixedEditor, false);
+  assert.equal(updated.scrollAwayNavigationCard, true);
   assert.equal(updated.mouseScroll, false);
   assert.deepEqual(updated.customItems, [{ id: "ci" }]);
 });
