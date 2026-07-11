@@ -48,16 +48,15 @@ const modelSegment: StatusLineSegment = {
     const opts = ctx.options.model ?? {};
 
     let modelName = ctx.model?.name || ctx.model?.id || "no-model";
-    const provider = typeof (ctx.model as { provider?: unknown } | undefined)?.provider === "string"
-      ? (ctx.model as { provider: string }).provider
-      : "";
-    // Strip "Claude " prefix for brevity
-    if (modelName.startsWith("Claude ")) {
+    const provider = ctx.model?.provider || ctx.model?.providerId || ctx.model?.providerName || "";
+    if (opts.display === "qualified" && ctx.model?.id) {
+      modelName = provider && !ctx.model.id.includes("/") ? `${provider}/${ctx.model.id}` : ctx.model.id;
+    } else if (modelName.startsWith("Claude ")) {
       modelName = modelName.slice(7);
     }
 
     let content = withIcon(icons.model, modelName);
-    if (provider && !modelName.startsWith(`${provider}/`)) {
+    if (opts.display === undefined && provider && !modelName.startsWith(`${provider}/`)) {
       content += ` (${provider})`;
     }
 
@@ -275,11 +274,24 @@ const costSegment: StatusLineSegment = {
       return { content: "", visible: false };
     }
 
+    const reportedCost = cost > 0 ? `$${cost.toFixed(2)}` : null;
+    if (!usingSubscription) {
+      return reportedCost
+        ? { content: color(ctx, "cost", reportedCost), visible: true }
+        : { content: "", visible: false };
+    }
+
     const subscriptionSummary = ctx.subscriptionUsage ? ` ${formatSubscriptionUsageSummary(ctx.subscriptionUsage)}` : "";
-    const costDisplay = usingSubscription
-      ? `(sub${subscriptionSummary})`
-      : `$${cost.toFixed(2)}`;
-    return { content: color(ctx, "cost", costDisplay), visible: true };
+    const subscriptionLabel = `(sub${subscriptionSummary})`;
+    const subscriptionDisplay = ctx.options.cost?.subscriptionDisplay ?? "subscription";
+    if (subscriptionDisplay === "reported-cost" && reportedCost) {
+      return { content: color(ctx, "cost", reportedCost), visible: true };
+    }
+    if (subscriptionDisplay === "both" && reportedCost) {
+      return { content: color(ctx, "cost", `${reportedCost} ${subscriptionLabel}`), visible: true };
+    }
+
+    return { content: color(ctx, "cost", subscriptionLabel), visible: true };
   },
 };
 

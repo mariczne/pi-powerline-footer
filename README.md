@@ -4,9 +4,9 @@ This is a fork of [nicobailon/pi-powerline-footer][upstream], a powerline-style
 status bar and welcome overlay extension for the [pi](https://github.com/badlogic/pi-mono)
 coding agent.
 
-> **The full feature set, installation, usage, and configuration docs live in the
-> [upstream README][upstream-readme].** This document only lists where this fork
-> diverges from upstream.
+> **Shared feature, installation, and configuration docs live in the
+> [upstream README][upstream-readme].** This document lists fork-specific
+> behavior; upstream Working Vibes documentation does not apply here.
 
 [upstream]: https://github.com/nicobailon/pi-powerline-footer
 [upstream-readme]: https://github.com/nicobailon/pi-powerline-footer#readme
@@ -15,10 +15,10 @@ coding agent.
 
 ### Added
 
-- **Provider shown next to the model.** The `model` segment appends the active
-  provider in parentheses (e.g. `Claude Sonnet (anthropic)`), taken from
-  `ctx.model.provider`. No provider suffix is added when the model name already
-  starts with `provider/`.
+- **Provider shown next to the model.** By default the `model` segment appends
+  the active provider in parentheses (e.g. `Sonnet 4 (anthropic)`). Set
+  `powerline.model.display` to `"name"` to suppress it or `"qualified"` to show
+  the canonical provider-qualified ID (e.g. `anthropic/claude-sonnet-4`).
 
 - **Subscription quota windows in the footer.** When the active model has a
   supported subscription usage source, the `cost` segment shows live usage
@@ -29,7 +29,9 @@ coding agent.
   intentionally ignored for now. Usage is cached for 2 minutes (30s on error)
   and refreshed only while streaming with an active subscription. Implemented in
   `subscription-usage.ts`; the parsed usage is exposed to segments via
-  `ctx.subscriptionUsage`.
+  `ctx.subscriptionUsage`. Set `powerline.cost.subscriptionDisplay` to
+  `"reported-cost"` for the reported dollar cost or `"both"` for cost plus the
+  subscription/quota display.
 
 - **Fixed-editor Shift+Enter restored on pi 0.77+.** The Kitty keyboard
   protocol negotiation is asynchronous on pi 0.77+, so the alternate screen's
