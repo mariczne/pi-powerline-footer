@@ -12,6 +12,7 @@ import {
   buildShortcutPaletteEntries,
   collectPiKeybindingDefinitions,
   getPowerlineShortcutHelpEntries,
+  isModalScopedKeybinding,
   isShortcutPaletteQueryInput,
   parseBashModeSettings,
   piShortcutGroupPrefix,
@@ -155,10 +156,25 @@ test("shortcut palette merges powerline and pi bindings with search-friendly met
     assert.equal(paletteEntry.runnable, true);
   }
 
-  // Every pi keybinding is present exactly once.
+  // Every pi keybinding is present exactly once — except modal-scoped ones,
+  // which can never run from the palette and are hinted inside their own UIs.
   for (const id of Object.keys(KEYBINDINGS)) {
-    assert.equal(entries.filter((candidate) => candidate.id === `pi:${id}`).length, 1);
+    const expected = isModalScopedKeybinding(id) && !runnableIds.has(id) ? 0 : 1;
+    assert.equal(entries.filter((candidate) => candidate.id === `pi:${id}`).length, expected, id);
   }
+  assert.equal(entries.find((entry) => entry.id === "pi:app.tree.filter.all"), undefined);
+  assert.equal(entries.find((entry) => entry.id === "pi:app.session.delete"), undefined);
+  assert.equal(entries.find((entry) => entry.id === "pi:tui.select.confirm"), undefined);
+  assert.ok(entries.find((entry) => entry.id === "pi:tui.editor.deleteWordBackward"));
+
+  // Modal-scoped classification.
+  assert.equal(isModalScopedKeybinding("app.tree.filter.all"), true);
+  assert.equal(isModalScopedKeybinding("app.models.save"), true);
+  assert.equal(isModalScopedKeybinding("app.session.rename"), true);
+  assert.equal(isModalScopedKeybinding("tui.select.up"), true);
+  assert.equal(isModalScopedKeybinding("tui.editor.undo"), false);
+  assert.equal(isModalScopedKeybinding("app.session.resume"), false);
+  assert.equal(isModalScopedKeybinding("app.interrupt"), false);
 
   // Configured keys override defaults; unconfigured fall back to defaults.
   const modelSelect = entries.find((entry) => entry.id === "pi:app.model.select");

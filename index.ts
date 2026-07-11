@@ -764,6 +764,16 @@ const SESSION_PICKER_KEYBINDING_IDS = new Set([
 
 const PI_PALETTE_RUN_EXCLUDED = new Set(["app.interrupt", "app.exit", "app.clear"]);
 
+// Bindings handled inside pi's modal selectors. Their handlers are private to
+// components that only exist while the modal is open and has focus — so they can
+// never be run from the palette, and those UIs render their own key hints anyway.
+export function isModalScopedKeybinding(id: string): boolean {
+  return id.startsWith("app.tree.")
+    || id.startsWith("app.models.")
+    || id.startsWith("tui.select.")
+    || SESSION_PICKER_KEYBINDING_IDS.has(id);
+}
+
 export function piShortcutGroupPrefix(id: string): string {
   if (id.startsWith("tui.select.")) return "Lists: ";
   if (id.startsWith("tui.")) return "Editor: ";
@@ -823,11 +833,16 @@ export function buildShortcutPaletteEntries(options: {
 
   const referenceEntries: ShortcutPaletteEntry[] = [];
   for (const [id, definition] of Object.entries(options.piKeybindings)) {
+    const runnable = options.isPiActionRunnable(id);
+    if (!runnable && isModalScopedKeybinding(id)) {
+      continue;
+    }
+
     const entry: ShortcutPaletteEntry = {
       id: `pi:${id}`,
       label: `${piShortcutGroupPrefix(id)}${definition.description ?? id}`,
       shortcut: definition.keys.filter(Boolean).join(", "),
-      runnable: options.isPiActionRunnable(id),
+      runnable,
     };
     (entry.runnable ? entries : referenceEntries).push(entry);
   }

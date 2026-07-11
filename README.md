@@ -42,11 +42,12 @@ coding agent.
 
 - **Shortcut palette.** `/powerline shortcuts` or `ctrl+shift+k` opens a
   searchable command palette listing the active Powerline bindings (prefixed
-  `Powerline: `) alongside all standard pi keybindings. Type to fuzzy-search,
-  press enter to run the highlighted action. Context-scoped bindings (editor
-  keys, tree view, session picker, model selector) are listed as searchable
-  reference entries. Configure or disable the key through
-  `powerlineShortcuts.showShortcuts`. The fixed-editor
+  `Powerline: `) alongside standard pi keybindings. Type to fuzzy-search, press
+  enter to run the highlighted action. Editor keybindings are included as
+  searchable reference entries since they apply to the editor the palette
+  returns to; bindings scoped to pi's modal selectors (tree view, session
+  picker, model selector) are omitted because those UIs show their own hints.
+  Configure or disable the key through `powerlineShortcuts.showShortcuts`. The fixed-editor
   scroll-away navigation card is off by default; opt in with
   `/powerline scroll-away-card on` or `powerline.scrollAwayNavigationCard: true`.
 
