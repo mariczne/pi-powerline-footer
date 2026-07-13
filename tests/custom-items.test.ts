@@ -23,7 +23,7 @@ test("parsePowerlineConfig supports object config with custom items", () => {
   assert.equal(config.mouseScroll, true);
   assert.equal(config.fixedEditor, true);
   assert.equal(config.scrollAwayNavigationCard, false);
-  assert.equal(config.welcome, true);
+  assert.equal(config.welcome, false);
   assert.equal(config.stashSharpSShortcut, false);
 });
 
@@ -52,12 +52,17 @@ test("parsePowerlineConfig supports welcome, shortcut, and navigation-card toggl
     { preset: "compact", welcome: false, stashSharpSShortcut: true, scrollAwayNavigationCard: true },
     ["default", "compact"],
   );
+  const optedIn = parsePowerlineConfig(
+    { preset: "compact", welcome: true },
+    ["default", "compact"],
+  );
   const shorthand = parsePowerlineConfig("compact", ["default", "compact"]);
 
   assert.equal(configured.welcome, false);
   assert.equal(configured.stashSharpSShortcut, true);
   assert.equal(configured.scrollAwayNavigationCard, true);
-  assert.equal(shorthand.welcome, true);
+  assert.equal(optedIn.welcome, true);
+  assert.equal(shorthand.welcome, false);
   assert.equal(shorthand.stashSharpSShortcut, false);
   assert.equal(shorthand.scrollAwayNavigationCard, false);
 });

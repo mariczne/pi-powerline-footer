@@ -51,6 +51,11 @@ coding agent.
   scroll-away navigation card is off by default; opt in with
   `/powerline scroll-away-card on` or `powerline.scrollAwayNavigationCard: true`.
 
+### Changed
+
+- **Welcome is opt-in.** The startup welcome overlay/header is off by default.
+  Set `powerline.welcome: true` to turn it back on. (Upstream defaults it on.)
+
 ### Removed
 
 - **Working Vibes.** The `/vibe` command, the `working-vibes.ts` module, its

@@ -59,7 +59,7 @@ let config: PowerlineConfig = {
   mouseScroll: true,
   fixedEditor: true,
   scrollAwayNavigationCard: false,
-  welcome: true,
+  welcome: false,
   stashSharpSShortcut: false,
 };
 

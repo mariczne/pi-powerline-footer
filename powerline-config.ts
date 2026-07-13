@@ -159,7 +159,7 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
     mouseScroll: true,
     fixedEditor: true,
     scrollAwayNavigationCard: false,
-    welcome: true,
+    welcome: false,
     stashSharpSShortcut: false,
   };
 
@@ -175,7 +175,7 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
     mouseScroll: value.mouseScroll !== false,
     fixedEditor: value.fixedEditor !== false,
     scrollAwayNavigationCard: value.scrollAwayNavigationCard === true,
-    welcome: value.welcome !== false,
+    welcome: value.welcome === true,
     stashSharpSShortcut: value.stashSharpSShortcut === true,
   };
 }

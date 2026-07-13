@@ -11,6 +11,7 @@
 - **Agent-dir path support** — Respects `PI_CODING_AGENT_DIR` for global powerline settings, stash history, sessions, skills, commands, and extension discovery. Thanks to Hrand Liu (@IstPlayer) for #86.
 
 ### Changed
+- **Welcome is now opt-in** — The startup welcome overlay/header is off by default. Set `powerline.welcome: true` to re-enable it. Previously it was on by default and required `powerline.welcome: false` to disable.
 - **Fixed-editor scroll-away card** — The scroll-away navigation card is now opt-in through `powerline.scrollAwayNavigationCard` or `/powerline scroll-away-card on`.
 - **Thinking level colors** — `high` now uses the normal `thinkingHigh` theme color; only `xhigh` and `max` use the rainbow treatment.
 - **Herdr and tmux scroll guidance** — Keeps fixed-editor mouse scrolling enabled by default and documents that host multiplexer scrollback needs `/powerline fixed-editor off`.
