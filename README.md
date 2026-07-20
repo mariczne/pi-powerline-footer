@@ -15,10 +15,16 @@ coding agent.
 
 ### Added
 
-- **Provider shown next to the model.** By default the `model` segment appends
-  the active provider in parentheses (e.g. `Sonnet 4 (anthropic)`). Set
-  `powerline.model.display` to `"name"` to suppress it or `"qualified"` to show
-  the canonical provider-qualified ID (e.g. `anthropic/claude-sonnet-4`).
+- **Shortcut palette.** `/powerline shortcuts` or `ctrl+shift+k` opens a
+  searchable command palette listing the active Powerline bindings (prefixed
+  `Powerline: `) alongside standard pi keybindings. Type to fuzzy-search, press
+  enter to run the highlighted action. Editor keybindings are included as
+  searchable reference entries since they apply to the editor the palette
+  returns to; bindings scoped to pi's modal selectors (tree view, session
+  picker, model selector) are omitted because those UIs show their own hints.
+  Configure or disable the key through `powerlineShortcuts.showShortcuts`. The fixed-editor
+  scroll-away navigation card is off by default; opt in with
+  `/powerline scroll-away-card on` or `powerline.scrollAwayNavigationCard: true`.
 
 - **Subscription quota windows in the footer.** When the active model has a
   supported subscription usage source, the `cost` segment shows live usage
@@ -33,6 +39,13 @@ coding agent.
   `"reported-cost"` for the reported dollar cost or `"both"` for cost plus the
   subscription/quota display.
 
+- **Provider shown next to the model.** By default the `model` segment appends
+  the active provider in parentheses (e.g. `Sonnet 4 (anthropic)`). Set
+  `powerline.model.display` to `"name"` to suppress it or `"qualified"` to show
+  the canonical provider-qualified ID (e.g. `anthropic/claude-sonnet-4`).
+
+### Fixed
+
 - **Fixed-editor Shift+Enter restored on pi 0.77+.** The Kitty keyboard
   protocol negotiation is asynchronous on pi 0.77+, so the alternate screen's
   keyboard-protocol stack could be left unset when `install()` ran, degrading
@@ -40,16 +53,6 @@ coding agent.
   re-checks the extended keyboard mode on each scrollable-root render and pushes
   it once the mode resolves (`ensureAlternateScreenKeyboardMode`).
 
-- **Shortcut palette.** `/powerline shortcuts` or `ctrl+shift+k` opens a
-  searchable command palette listing the active Powerline bindings (prefixed
-  `Powerline: `) alongside standard pi keybindings. Type to fuzzy-search, press
-  enter to run the highlighted action. Editor keybindings are included as
-  searchable reference entries since they apply to the editor the palette
-  returns to; bindings scoped to pi's modal selectors (tree view, session
-  picker, model selector) are omitted because those UIs show their own hints.
-  Configure or disable the key through `powerlineShortcuts.showShortcuts`. The fixed-editor
-  scroll-away navigation card is off by default; opt in with
-  `/powerline scroll-away-card on` or `powerline.scrollAwayNavigationCard: true`.
 
 ### Changed
 
