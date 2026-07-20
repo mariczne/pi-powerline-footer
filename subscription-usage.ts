@@ -18,8 +18,8 @@ export type SupportedSubscriptionProvider = typeof SUPPORTED_SUBSCRIPTION_PROVID
 
 export interface SubscriptionUsage {
   provider: SupportedSubscriptionProvider;
-  sessionPercent: number;
-  weeklyPercent: number;
+  sessionPercent?: number;
+  weeklyPercent?: number;
   sessionResetAt?: number;
   weeklyResetAt?: number;
   fetchedAt: number;
@@ -95,9 +95,13 @@ export function isSubscriptionUsageEnabled(
 
 export function formatSubscriptionUsageSummary(usage: SubscriptionUsage, nowMs = Date.now()): string {
   return [
-    formatUsageWindow("5h", invertPercent(usage.sessionPercent), usage.sessionResetAt, nowMs),
-    formatUsageWindow("7d", invertPercent(usage.weeklyPercent), usage.weeklyResetAt, nowMs),
-  ].join(" ");
+    typeof usage.sessionPercent === "number"
+      ? formatUsageWindow("5h", invertPercent(usage.sessionPercent), usage.sessionResetAt, nowMs)
+      : null,
+    typeof usage.weeklyPercent === "number"
+      ? formatUsageWindow("7d", invertPercent(usage.weeklyPercent), usage.weeklyResetAt, nowMs)
+      : null,
+  ].filter((window): window is string => window !== null).join(" ");
 }
 
 export async function fetchProviderSubscriptionUsage(
@@ -111,10 +115,7 @@ export async function fetchProviderSubscriptionUsage(
 
   return {
     provider,
-    sessionPercent: parsed.sessionPercent,
-    weeklyPercent: parsed.weeklyPercent,
-    sessionResetAt: parsed.sessionResetAt,
-    weeklyResetAt: parsed.weeklyResetAt,
+    ...parsed,
     fetchedAt: config.nowMs ?? Date.now(),
   };
 }

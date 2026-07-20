@@ -1,6 +1,6 @@
 export interface ParsedUsageWindow {
-  sessionPercent: number;
-  weeklyPercent: number;
+  sessionPercent?: number;
+  weeklyPercent?: number;
   sessionResetAt?: number;
   weeklyResetAt?: number;
 }

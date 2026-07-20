@@ -55,6 +55,20 @@ test("cost segment shows subscription usage windows when available", () => {
   assert.equal(rendered.content, `(sub [5h 45% 15:23] [7d 78% ${weeklyResetLabel}])`);
 });
 
+test("cost segment renders a single weekly subscription window", () => {
+  const rendered = renderSegment("cost", createSegmentContext({
+    usingSubscription: true,
+    subscriptionUsage: {
+      provider: "openai-codex",
+      weeklyPercent: 25,
+      fetchedAt: Date.now(),
+    },
+  }));
+
+  assert.equal(rendered.visible, true);
+  assert.equal(rendered.content, "(sub [7d 75%])");
+});
+
 test("cost segment falls back to plain subscription marker before usage loads", () => {
   const rendered = renderSegment("cost", createSegmentContext({
     usingSubscription: true,

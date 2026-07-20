@@ -50,6 +50,40 @@ test("codex usage parser reads primary and secondary window percentages", () => 
   });
 });
 
+test("codex one-week responses retain their quota window", async () => {
+  const usage = await fetchProviderSubscriptionUsage("openai-codex", "codex-token", undefined, {
+    nowMs: 1000,
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          rate_limit: {
+            primary_window: {
+              used_percent: 25,
+              limit_window_seconds: 604800,
+              reset_after_seconds: 384403,
+            },
+            secondary_window: null,
+          },
+        };
+      },
+    }) as Response,
+  });
+
+  assert.deepEqual(usage, {
+    provider: "openai-codex",
+    weeklyPercent: 25,
+    weeklyResetAt: 384404000,
+    fetchedAt: 1000,
+  });
+  assert.equal(formatSubscriptionUsageSummary({
+    provider: "openai-codex",
+    weeklyPercent: 25,
+    fetchedAt: 1000,
+  }), "[7d 75%]");
+});
+
 test("anthropic usage parser reads five-hour and seven-day utilization", () => {
   const sessionResetAt = new Date(2026, 4, 26, 15, 23, 0, 0).getTime();
   const weeklyResetAt = new Date(2026, 4, 31, 0, 0, 0, 0).getTime();
