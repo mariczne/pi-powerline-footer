@@ -59,6 +59,10 @@ coding agent.
 - **Welcome is opt-in.** The startup welcome overlay/header is off by default.
   Set `powerline.welcome: true` to turn it back on. (Upstream defaults it on.)
 
+- **Thinking-level styling.** `high` uses the normal `thinkingHigh` theme
+  color; only `xhigh` and `max` use rainbow styling. `max` also has an explicit
+  footer label/icon. Upstream applies rainbow styling to `high` too.
+
 ### Removed
 
 - **Working Vibes.** The `/vibe` command, the `working-vibes.ts` module, its
