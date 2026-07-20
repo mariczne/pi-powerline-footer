@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getThinkingText } from "../icons.ts";
 import { renderSegment } from "../segments.ts";
+import { rainbow } from "../theme.ts";
 import type { ColorScheme, SegmentContext, ThemeLike } from "../types.ts";
 
 function hexAnsi(hex: `#${string}`): string {
@@ -22,6 +23,7 @@ function createSegmentContext(thinkingLevel: string, colors: ColorScheme): Segme
     thinkingLevel,
     sessionId: undefined,
     usageStats: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
+    contextTokens: 0,
     contextPercent: 0,
     contextWindow: 0,
     autoCompactEnabled: true,
@@ -79,4 +81,16 @@ test("thinking segment reserves rainbow for xhigh and max", () => {
   assert.equal(stripAnsi(xhigh.content), "think:xhigh");
   assert.equal(stripAnsi(max.content), "think:max");
   assert.ok(getThinkingText("max")?.includes("max"));
+});
+
+test("thinking segment uses rainbow styling for xhigh and max", () => {
+  const colors: ColorScheme = { thinking: "#111111" };
+
+  for (const level of ["xhigh", "max"]) {
+    const rendered = renderSegment("thinking", createSegmentContext(level, colors));
+    assert.deepEqual(rendered, {
+      content: rainbow(`think:${level}`),
+      visible: true,
+    });
+  }
 });

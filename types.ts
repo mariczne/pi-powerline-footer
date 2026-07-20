@@ -29,26 +29,29 @@ export type SemanticColor =
 export type ColorScheme = Partial<Record<SemanticColor, ColorValue>>;
 
 // Built-in segment identifiers
-export type BuiltinStatusLineSegmentId =
-  | "model"
-  | "shell_mode"
-  | "path"
-  | "git"
-  | "subagents"
-  | "token_in"
-  | "token_out"
-  | "token_total"
-  | "cost"
-  | "context_pct"
-  | "context_total"
-  | "time_spent"
-  | "time"
-  | "session"
-  | "hostname"
-  | "cache_read"
-  | "cache_write"
-  | "thinking"
-  | "extension_statuses";
+export const BUILTIN_STATUS_LINE_SEGMENT_IDS = [
+  "model",
+  "shell_mode",
+  "path",
+  "git",
+  "subagents",
+  "token_in",
+  "token_out",
+  "token_total",
+  "cost",
+  "context_pct",
+  "context_total",
+  "time_spent",
+  "time",
+  "session",
+  "hostname",
+  "cache_read",
+  "cache_write",
+  "thinking",
+  "extension_statuses",
+] as const;
+
+export type BuiltinStatusLineSegmentId = typeof BUILTIN_STATUS_LINE_SEGMENT_IDS[number];
 
 // Segment identifiers (built-in + dynamically registered custom items)
 export type StatusLineSegmentId = BuiltinStatusLineSegmentId | `custom:${string}`;
@@ -67,14 +70,15 @@ export type StatusLineSeparatorStyle =
   | "star";
 
 // Preset names
+export type PowerlinePlacement = "above" | "below";
+
 export type StatusLinePreset =
   | "default"
   | "minimal"
   | "compact"
   | "full"
   | "nerd"
-  | "ascii"
-  | "custom";
+  | "ascii";
 
 // Per-segment options
 export interface StatusLineSegmentOptions {
@@ -95,6 +99,12 @@ export interface StatusLineSegmentOptions {
 }
 
 export type CustomItemPosition = "left" | "right" | "secondary";
+
+export interface StatusLineLayout {
+  left?: StatusLineSegmentId[];
+  right?: StatusLineSegmentId[];
+  secondary?: StatusLineSegmentId[];
+}
 
 export interface CustomStatusItem {
   id: string;
@@ -164,6 +174,7 @@ export interface SegmentContext {
   
   // Computed
   usageStats: UsageStats;
+  contextTokens: number;
   contextPercent: number;
   contextWindow: number;
   autoCompactEnabled: boolean;

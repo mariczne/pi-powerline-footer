@@ -9,6 +9,13 @@
 - **Legacy sharp-S stash opt-in** — Added `powerline.stashSharpSShortcut` for users who intentionally want printable `ß` to trigger stash. Thanks to SebastianRuettiRuettger and Filip (@filipores) for #39/#84.
 - **Contribution guide** — Added lightweight bug report, feature request, PR, testing, docs, and changelog guidance. Thanks to OCPdev25 for #49.
 - **Agent-dir path support** — Respects `PI_CODING_AGENT_DIR` for global powerline settings, stash history, sessions, skills, commands, and extension discovery. Thanks to Hrand Liu (@IstPlayer) for #86.
+- **Segment disabling** — Added `powerline.disabledSegments` to hide built-in or configured custom segments from any preset. Thanks to Brian Lange (@bjlange) for #88.
+- **Startup token estimate** — The welcome UI now shows an approximate initial system-prompt token count before the first message. Thanks to Ibrahim Mohammed (@IbrahimMohammed47) for #80.
+- **Configurable segment layout** — Added `powerline.layout` for exact `left`, `right`, and `secondary` group overrides on any preset, including explicit `custom:<id>` placement. Thanks to Bruno Orsolon (@brunoorsolon), Thurston Sandberg (@thurstonsand), and Arthur Bodera (@Thinkscape) for #54/#40/#37.
+- **Primary row placement** — Added `powerline.placement` and `/powerline placement above|below|toggle` to move the primary powerline row around the editor while keeping notifications and responsive overflow in their existing groups. Thanks to Rogerio Saulo (@rsaulo) for #77.
+
+### Removed
+- **Fixed `custom` preset** — Use `powerline.layout` with another preset instead.
 
 ### Changed
 - **Welcome is now opt-in** — The startup welcome overlay/header is off by default. Set `powerline.welcome: true` to re-enable it. Previously it was on by default and required `powerline.welcome: false` to disable.
@@ -17,20 +24,23 @@
 - **Herdr and tmux scroll guidance** — Keeps fixed-editor mouse scrolling enabled by default and documents that host multiplexer scrollback needs `/powerline fixed-editor off`.
 - **Bottom jump shortcut** — Uses `ctrl+alt+g` as the default fixed-editor jump-to-bottom shortcut instead of `ctrl+shift+g`.
 - **Stash shortcut safety** — Literal `ß` is no longer consumed as stash by default; unambiguous Alt/Meta-S escape encodings still work.
-- **Docs for UI and demo settings** — Clarified that the README screenshot is illustrative, documented a current footer setup, noted the old chrome limitation, and documented the URL Ctrl-click mouse-reporting limitation. Thanks to Yosof Badr (@yosofbadr), kaiwah, Jason (@itguy327), Oliver Mannion (@tekumara), and thurstonsand for #75/#63/#45.
+- **Docs for UI and demo settings** — Clarified that the README screenshot is illustrative, documented a current footer setup, noted the old chrome limitation, and documented the URL modifier-click mouse-capture limitation plus Shift bypass. Thanks to Yosof Badr (@yosofbadr), kaiwah, Jason (@itguy327), Oliver Mannion (@tekumara), thurstonsand, jmd1011, and Thomas Dietert (@tdietert) for #75/#63/#45/#93/#95.
 - **Pi 0.80 compatibility** — Widened peer ranges and refreshed dev dependencies against `@earendil-works/*` 0.80.3. Thanks to Alexander Gerdes (@Avg8888) and AlexKucera for #87.
 - **Shortcut disabling** — `powerlineShortcuts` and `bashMode.toggleShortcut` now treat `null` or `""` as explicit disabled values and omit disabled chat jumps from fixed-editor hints. Thanks to Koen De Jaeger (@kdejaeger) for #73.
 - **Editor autocomplete composition** — Powerline now passes Pi's autocomplete provider through a previous editor's `setAutocompleteProvider()` before adding bash-mode wrappers, preserving prior autocomplete-provider wrappers where possible. Thanks to Tifan Dwi Avianto (@tifandotme) for #61.
+- **Context usage display** — The context segment now shows used tokens, maximum tokens, and percentage together. Thanks to Fayi Femi-Balogun (@fayimora) for #92.
+- **Maximum thinking style** — Pi's `max` thinking level uses the rainbow treatment alongside `xhigh`. Thanks to @AiraNadih for #94.
 
 ### Fixed
 - **Fixed-editor wheel bursts** — Coalesces rapid mouse-wheel packets into throttled viewport repaints and defers the follow-up TUI render until scrolling settles, reducing flicker and slowdowns in terminal multiplexers.
 - **Welcome discovery noise** — Ignored vanished/dangling skill, extension, and prompt-template entries during welcome overlay discovery instead of printing stack traces.
-- **Reload keyboard protocol** — Preserves extended keyboard modes on `/reload` and only hard-resets them on real quit. Thanks to Francesco Buldo (@frabul) for #81/#82.
+- **Reload keyboard protocol** — Preserves extended keyboard modes on `/reload` and only hard-resets them on real quit. Thanks to Francesco Buldo (@frabul), Alexander Gerdes (@Avg8888), and Sylvain Rivierre (@slhad) for #81/#82/#85.
 - **Prompt history recall** — Up-arrow prompt history no longer clobbers multiline drafts from the last logical line. Thanks to Nelson Tam (@nelson) and ceblan for #79.
 - **Stale extension contexts** — Handles both old and new Pi stale-context messages and guards late `agent_end` UI access without swallowing unrelated errors. Thanks to JackIce (@jackice) and Salem Sayed Abdel Gawad (@salemsayed) for #62, and Joshua Brunner (@joshuajbrunner), Arthur Bodera (@Thinkscape), @k0valik, and ET (@EdrisT) for #33.
 - **Context icon glyph** — Switched the Nerd Font context icon to a stable v3-friendly database glyph. Thanks to Michael Leonard (@LeonardMH) for #41.
 - **Recent session names** — Recent-session project names now prefer the session JSONL header `cwd` basename before falling back to encoded directory names. Thanks to Jon Leemon (@nomeelnoj) for #76.
 - **Quit cursor restore** — When fixed-editor mode is off, quitting now moves the terminal cursor below Pi's inline editor area without running on `/reload` or session switches. Thanks to afkdev8 (@mrinfinidy) for #60.
+- **Custom cursor bindings** — Prompt-history recall now intercepts only literal Up/Down arrows, so custom cursor bindings such as `alt+j` and `alt+k` reach normal editor movement. Thanks to Hrand Liu (@IstPlayer) for #96.
 
 ## [0.6.1] - 2026-06-08
 

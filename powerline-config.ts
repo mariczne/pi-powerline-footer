@@ -1,13 +1,20 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { ColorValue, CustomItemPosition, CustomStatusItem, PresetDef, StatusLinePreset, StatusLineSegmentId, StatusLineSegmentOptions } from "./types.ts";
+import { BUILTIN_STATUS_LINE_SEGMENT_IDS } from "./types.ts";
+import type { ColorValue, CustomItemPosition, CustomStatusItem, PowerlinePlacement, PresetDef, StatusLineLayout, StatusLinePreset, StatusLineSegmentId, StatusLineSegmentOptions } from "./types.ts";
 
 export interface PowerlineConfig {
   preset: StatusLinePreset;
   customItems: CustomStatusItem[];
+  disabledSegments: StatusLineSegmentId[];
+  invalidDisabledSegments: string[];
+  layout: StatusLineLayout | null;
+  invalidLayoutSegments: string[];
   segmentOptions: StatusLineSegmentOptions;
   mouseScroll: boolean;
   fixedEditor: boolean;
   scrollAwayNavigationCard: boolean;
+  placement: PowerlinePlacement;
+  invalidPlacement: string | null;
   welcome: boolean;
   stashSharpSShortcut: boolean;
 }
@@ -20,6 +27,20 @@ function normalizePreset(value: unknown, presets: readonly StatusLinePreset[]): 
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
   return (presets as readonly string[]).includes(normalized) ? (normalized as StatusLinePreset) : null;
+}
+
+function normalizePlacement(value: unknown): { placement: PowerlinePlacement; invalidPlacement: string | null } {
+  if (value === undefined) return { placement: "above", invalidPlacement: null };
+
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "above" || normalized === "below") {
+    return { placement: normalized, invalidPlacement: null };
+  }
+
+  return {
+    placement: "above",
+    invalidPlacement: typeof value === "string" ? value.trim() : String(value),
+  };
 }
 
 function normalizeCustomItemId(value: unknown): string | null {
@@ -85,6 +106,85 @@ function normalizeCustomItems(raw: unknown): CustomStatusItem[] {
   }
 
   return [...deduped.values()];
+}
+
+const BUILTIN_STATUS_LINE_SEGMENT_ID_SET = new Set<string>(BUILTIN_STATUS_LINE_SEGMENT_IDS);
+
+function normalizeStatusLineSegmentId(value: unknown, customItemIds: ReadonlySet<string>): StatusLineSegmentId | null {
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim();
+  if (BUILTIN_STATUS_LINE_SEGMENT_ID_SET.has(normalized)) {
+    return normalized as StatusLineSegmentId;
+  }
+
+  const customId = normalized.startsWith("custom:")
+    ? normalizeCustomItemId(normalized.slice("custom:".length))
+    : null;
+  return customId && customItemIds.has(customId) ? `custom:${customId}` : null;
+}
+
+function normalizeDisabledSegments(
+  raw: unknown,
+  customItems: readonly CustomStatusItem[],
+): { disabledSegments: StatusLineSegmentId[]; invalidDisabledSegments: string[] } {
+  if (!Array.isArray(raw)) return { disabledSegments: [], invalidDisabledSegments: [] };
+
+  const disabledSegments: StatusLineSegmentId[] = [];
+  const invalidDisabledSegments: string[] = [];
+  const customItemIds = new Set(customItems.map((item) => item.id));
+  const seen = new Set<StatusLineSegmentId>();
+
+  for (const entry of raw) {
+    const segmentId = normalizeStatusLineSegmentId(entry, customItemIds);
+    if (!segmentId) {
+      invalidDisabledSegments.push(typeof entry === "string" ? entry.trim() : String(entry));
+    } else if (!seen.has(segmentId)) {
+      seen.add(segmentId);
+      disabledSegments.push(segmentId);
+    }
+  }
+
+  return { disabledSegments, invalidDisabledSegments };
+}
+
+function normalizeLayout(
+  raw: unknown,
+  customItems: readonly CustomStatusItem[],
+): { layout: StatusLineLayout | null; invalidLayoutSegments: string[] } {
+  if (!isRecord(raw)) return { layout: null, invalidLayoutSegments: [] };
+
+  const layout: StatusLineLayout = {};
+  const invalidLayoutSegments: string[] = [];
+  const customItemIds = new Set(customItems.map((item) => item.id));
+  const globallyPlaced = new Set<StatusLineSegmentId>();
+
+  for (const row of ["left", "right", "secondary"] as const) {
+    const entries = raw[row];
+    if (!Array.isArray(entries)) continue;
+
+    const segments: StatusLineSegmentId[] = [];
+    const seen = new Set<StatusLineSegmentId>();
+    for (const entry of entries) {
+      const segmentId = normalizeStatusLineSegmentId(entry, customItemIds);
+      if (!segmentId) {
+        invalidLayoutSegments.push(`${row}:${typeof entry === "string" ? entry.trim() : String(entry)}`);
+      } else if (!seen.has(segmentId)) {
+        seen.add(segmentId);
+        if (globallyPlaced.has(segmentId)) {
+          invalidLayoutSegments.push(`${row}:${segmentId}`);
+        } else {
+          globallyPlaced.add(segmentId);
+          segments.push(segmentId);
+        }
+      }
+    }
+    layout[row] = segments;
+  }
+
+  return Object.keys(layout).length > 0
+    ? { layout, invalidLayoutSegments }
+    : { layout: null, invalidLayoutSegments };
 }
 
 function normalizeSegmentOptions(raw: Record<string, unknown>): StatusLineSegmentOptions {
@@ -155,10 +255,16 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
   const defaultConfig: PowerlineConfig = {
     preset: "default",
     customItems: [],
+    disabledSegments: [],
+    invalidDisabledSegments: [],
+    layout: null,
+    invalidLayoutSegments: [],
     segmentOptions: {},
     mouseScroll: true,
     fixedEditor: true,
     scrollAwayNavigationCard: false,
+    placement: "above",
+    invalidPlacement: null,
     welcome: false,
     stashSharpSShortcut: false,
   };
@@ -168,35 +274,75 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
 
   if (!isRecord(value)) return defaultConfig;
 
+  const customItems = normalizeCustomItems(value.customItems);
+  const { disabledSegments, invalidDisabledSegments } = normalizeDisabledSegments(value.disabledSegments, customItems);
+  const { layout, invalidLayoutSegments } = normalizeLayout(value.layout, customItems);
+  const { placement, invalidPlacement } = normalizePlacement(value.placement);
+
   return {
     preset: normalizePreset(value.preset, presets) ?? defaultConfig.preset,
-    customItems: normalizeCustomItems(value.customItems),
+    customItems,
+    disabledSegments,
+    invalidDisabledSegments,
+    layout,
+    invalidLayoutSegments,
     segmentOptions: normalizeSegmentOptions(value),
     mouseScroll: value.mouseScroll !== false,
     fixedEditor: value.fixedEditor !== false,
     scrollAwayNavigationCard: value.scrollAwayNavigationCard === true,
+    placement,
+    invalidPlacement,
     welcome: value.welcome === true,
     stashSharpSShortcut: value.stashSharpSShortcut === true,
   };
 }
 
-export function mergeSegmentsWithCustomItems(presetDef: PresetDef, customItems: readonly CustomStatusItem[]): {
+export function mergeSegmentsWithCustomItems(
+  presetDef: PresetDef,
+  customItems: readonly CustomStatusItem[],
+  options: {
+    layout?: StatusLineLayout | null;
+    disabledSegments?: readonly StatusLineSegmentId[];
+  } = {},
+): {
   leftSegments: StatusLineSegmentId[];
   rightSegments: StatusLineSegmentId[];
   secondarySegments: StatusLineSegmentId[];
 } {
-  const left: StatusLineSegmentId[] = [...presetDef.leftSegments];
-  const right: StatusLineSegmentId[] = [...presetDef.rightSegments];
-  const secondary: StatusLineSegmentId[] = [...(presetDef.secondarySegments ?? [])];
+  const layout = options.layout ?? null;
+  const explicitlyPlaced = new Set([
+    ...(layout?.left ?? []),
+    ...(layout?.right ?? []),
+    ...(layout?.secondary ?? []),
+  ]);
+  const disabled = new Set(options.disabledSegments ?? []);
 
-  for (const item of customItems) {
-    const segmentId: StatusLineSegmentId = `custom:${item.id}`;
-    if (item.position === "left") left.push(segmentId);
-    else if (item.position === "secondary") secondary.push(segmentId);
-    else right.push(segmentId);
-  }
+  const buildRow = (
+    position: CustomItemPosition,
+    configured: StatusLineSegmentId[] | undefined,
+    presetSegments: readonly StatusLineSegmentId[],
+  ): StatusLineSegmentId[] => {
+    const segments = configured !== undefined
+      ? [...configured]
+      : presetSegments.filter((id) => !explicitlyPlaced.has(id));
 
-  return { leftSegments: left, rightSegments: right, secondarySegments: secondary };
+    if (configured === undefined) {
+      for (const item of customItems) {
+        const segmentId: StatusLineSegmentId = `custom:${item.id}`;
+        if (item.position === position && !explicitlyPlaced.has(segmentId)) {
+          segments.push(segmentId);
+        }
+      }
+    }
+
+    return segments.filter((id) => !disabled.has(id));
+  };
+
+  return {
+    leftSegments: buildRow("left", layout?.left, presetDef.leftSegments),
+    rightSegments: buildRow("right", layout?.right, presetDef.rightSegments),
+    secondarySegments: buildRow("secondary", layout?.secondary, presetDef.secondarySegments ?? []),
+  };
 }
 
 export function nextPowerlineSettingWithPreset(existingPowerlineSetting: unknown, preset: StatusLinePreset): unknown {
@@ -208,7 +354,7 @@ export function nextPowerlineSettingWithPreset(existingPowerlineSetting: unknown
 
 export function nextPowerlineSettingWithOptions(
   existingPowerlineSetting: unknown,
-  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "scrollAwayNavigationCard" | "welcome" | "stashSharpSShortcut">>,
+  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "scrollAwayNavigationCard" | "welcome" | "stashSharpSShortcut" | "placement">>,
   currentPreset: StatusLinePreset,
 ): unknown {
   if (!isRecord(existingPowerlineSetting)) {

@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { collectHiddenExtensionStatusKeys, getNotificationExtensionStatuses, normalizeExtensionStatusValue, parsePowerlineConfig, mergeSegmentOptions, mergeSegmentsWithCustomItems, nextPowerlineSettingWithOptions, nextPowerlineSettingWithPreset, normalizeCompactExtensionStatus } from "../powerline-config.ts";
+import { PRESETS } from "../presets.ts";
+
+test("fixed custom preset is removed in favor of powerline.layout", () => {
+  assert.equal("custom" in PRESETS, false);
+});
 
 test("parsePowerlineConfig supports object config with custom items", () => {
   const config = parsePowerlineConfig(
@@ -20,11 +25,77 @@ test("parsePowerlineConfig supports object config with custom items", () => {
   assert.equal(config.customItems[0].statusKey, "ci-status");
   assert.equal(config.customItems[1].statusKey, "review");
   assert.equal(config.customItems[1].hideWhenMissing, false);
+  assert.deepEqual(config.disabledSegments, []);
+  assert.deepEqual(config.invalidDisabledSegments, []);
+  assert.equal(config.layout, null);
+  assert.deepEqual(config.invalidLayoutSegments, []);
   assert.equal(config.mouseScroll, true);
   assert.equal(config.fixedEditor, true);
   assert.equal(config.scrollAwayNavigationCard, false);
+  assert.equal(config.placement, "above");
+  assert.equal(config.invalidPlacement, null);
   assert.equal(config.welcome, false);
   assert.equal(config.stashSharpSShortcut, false);
+});
+
+test("parsePowerlineConfig supports disabled segments", () => {
+  const config = parsePowerlineConfig(
+    {
+      preset: "default",
+      customItems: [{ id: "ci" }],
+      disabledSegments: [
+        "cost",
+        " extension_statuses ",
+        "custom:ci",
+        "cost",
+        "unknown",
+        "custom:missing",
+        123,
+      ],
+    },
+    ["default", "compact"],
+  );
+
+  assert.deepEqual(config.disabledSegments, ["cost", "extension_statuses", "custom:ci"]);
+  assert.deepEqual(config.invalidDisabledSegments, ["unknown", "custom:missing", "123"]);
+});
+
+test("parsePowerlineConfig supports partial explicit layout rows", () => {
+  const config = parsePowerlineConfig(
+    {
+      preset: "default",
+      customItems: [{ id: "ci" }],
+      layout: {
+        left: ["model", "custom:ci", "model", "unknown", 123],
+        right: ["model", "cost"],
+        secondary: [],
+      },
+    },
+    ["default", "compact"],
+  );
+
+  assert.deepEqual(config.layout, {
+    left: ["model", "custom:ci"],
+    right: ["cost"],
+    secondary: [],
+  });
+  assert.deepEqual(config.invalidLayoutSegments, ["left:unknown", "left:123", "right:model"]);
+});
+
+test("parsePowerlineConfig validates primary powerline placement", () => {
+  const below = parsePowerlineConfig(
+    { preset: "compact", placement: "below" },
+    ["default", "compact"],
+  );
+  const invalid = parsePowerlineConfig(
+    { preset: "compact", placement: "sideways" },
+    ["default", "compact"],
+  );
+
+  assert.equal(below.placement, "below");
+  assert.equal(below.invalidPlacement, null);
+  assert.equal(invalid.placement, "above");
+  assert.equal(invalid.invalidPlacement, "sideways");
 });
 
 test("parsePowerlineConfig supports disabling mouse scroll", () => {
@@ -125,6 +196,53 @@ test("mergeSegmentsWithCustomItems appends custom segment ids by position", () =
   assert.deepEqual(merged.secondarySegments, ["extension_statuses", "custom:review"]);
 });
 
+test("mergeSegmentsWithCustomItems filters disabled segment ids", () => {
+  const merged = mergeSegmentsWithCustomItems(
+    {
+      leftSegments: ["path", "model"],
+      rightSegments: ["git", "cost"],
+      secondarySegments: ["extension_statuses"],
+      separator: "powerline",
+    },
+    [
+      { id: "ci", statusKey: "ci", position: "left", hideWhenMissing: true, excludeFromExtensionStatuses: true },
+      { id: "timer", statusKey: "timer", position: "right", hideWhenMissing: true, excludeFromExtensionStatuses: true },
+      { id: "review", statusKey: "review", position: "secondary", hideWhenMissing: true, excludeFromExtensionStatuses: true },
+    ],
+    { disabledSegments: ["model", "cost", "custom:ci", "custom:review"] },
+  );
+
+  assert.deepEqual(merged.leftSegments, ["path"]);
+  assert.deepEqual(merged.rightSegments, ["git", "custom:timer"]);
+  assert.deepEqual(merged.secondarySegments, ["extension_statuses"]);
+});
+
+test("mergeSegmentsWithCustomItems applies partial layout rows before disabled filtering", () => {
+  const merged = mergeSegmentsWithCustomItems(
+    {
+      leftSegments: ["path", "model"],
+      rightSegments: ["git", "cost", "extension_statuses"],
+      secondarySegments: ["extension_statuses"],
+      separator: "powerline",
+    },
+    [
+      { id: "ci", statusKey: "ci", position: "right", hideWhenMissing: true, excludeFromExtensionStatuses: true },
+      { id: "review", statusKey: "review", position: "secondary", hideWhenMissing: true, excludeFromExtensionStatuses: true },
+    ],
+    {
+      layout: {
+        left: ["model", "custom:ci", "extension_statuses"],
+        secondary: [],
+      },
+      disabledSegments: ["model"],
+    },
+  );
+
+  assert.deepEqual(merged.leftSegments, ["custom:ci", "extension_statuses"]);
+  assert.deepEqual(merged.rightSegments, ["git", "cost"]);
+  assert.deepEqual(merged.secondarySegments, []);
+});
+
 test("nextPowerlineSettingWithPreset preserves object settings", () => {
   const updated = nextPowerlineSettingWithPreset({ preset: "default", customItems: [{ id: "ci" }] }, "compact");
   if (typeof updated !== "object" || updated === null || Array.isArray(updated)) {
@@ -144,7 +262,7 @@ test("nextPowerlineSettingWithPreset preserves object settings", () => {
 test("nextPowerlineSettingWithOptions preserves object settings", () => {
   const updated = nextPowerlineSettingWithOptions(
     { preset: "default", customItems: [{ id: "ci" }], mouseScroll: false },
-    { fixedEditor: false, scrollAwayNavigationCard: true },
+    { fixedEditor: false, scrollAwayNavigationCard: true, placement: "below" },
     "compact",
   );
   if (typeof updated !== "object" || updated === null || Array.isArray(updated)) {
@@ -155,6 +273,7 @@ test("nextPowerlineSettingWithOptions preserves object settings", () => {
   assert.equal(updated.fixedEditor, false);
   assert.equal(updated.scrollAwayNavigationCard, true);
   assert.equal(updated.mouseScroll, false);
+  assert.equal(updated.placement, "below");
   assert.deepEqual(updated.customItems, [{ id: "ci" }]);
 });
 

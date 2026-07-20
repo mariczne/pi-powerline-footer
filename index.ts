@@ -34,7 +34,7 @@ import { WelcomeComponent, WelcomeHeader, discoverLoadedCounts, getRecentSession
 import { createWelcomeDismissScheduler } from "./welcome-dismiss.ts";
 import { createRenderScheduler } from "./render-scheduler.ts";
 import { getEditorAutocompleteProvider, passAutocompleteProviderThroughPreviousEditor } from "./editor-composition.ts";
-import { readCoreContextUsage } from "./context-usage.ts";
+import { estimateInitialContextTokens, readCoreContextUsage } from "./context-usage.ts";
 import { isStaleExtensionContextError, shouldResetExtendedKeyboardModesOnShutdown, shouldRestoreInlineEditorCursorOnShutdown, shouldShowStartupWelcome } from "./lifecycle.ts";
 import { fetchProviderSubscriptionUsage, getSupportedSubscriptionProvider, isSubscriptionUsageEnabled, type SubscriptionUsage } from "./subscription-usage.ts";
 import { renderFixedEditorCluster } from "./fixed-editor/cluster.ts";
@@ -56,9 +56,16 @@ import {
 let config: PowerlineConfig = {
   preset: "default",
   customItems: [],
+  disabledSegments: [],
+  invalidDisabledSegments: [],
+  layout: null,
+  invalidLayoutSegments: [],
+  segmentOptions: {},
   mouseScroll: true,
   fixedEditor: true,
   scrollAwayNavigationCard: false,
+  placement: "above",
+  invalidPlacement: null,
   welcome: false,
   stashSharpSShortcut: false,
 };
@@ -630,7 +637,7 @@ function writePowerlinePresetSetting(preset: StatusLinePreset, cwd: string = pro
 
 function writePowerlineOptionSetting(
   cwd: string,
-  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "scrollAwayNavigationCard" | "welcome" | "stashSharpSShortcut">>,
+  updates: Partial<Pick<PowerlineConfig, "mouseScroll" | "fixedEditor" | "scrollAwayNavigationCard" | "welcome" | "stashSharpSShortcut" | "placement">>,
   currentPreset: StatusLinePreset,
 ): boolean {
   return writePowerlineSetting(cwd, (existingPowerlineSetting) => (
@@ -1135,7 +1142,10 @@ function computeResponsiveLayout(
   const sepWidth = visibleWidth(separatorDef.left) + 2; // separator + spaces around it
   
   // Get all segments: primary first, then secondary
-  const mergedSegments = mergeSegmentsWithCustomItems(presetDef, config.customItems);
+  const mergedSegments = mergeSegmentsWithCustomItems(presetDef, config.customItems, {
+    layout: config.layout,
+    disabledSegments: config.disabledSegments,
+  });
   const primaryIds = [...mergedSegments.leftSegments, ...mergedSegments.rightSegments];
   const secondaryIds = mergedSegments.secondarySegments;
   const allSegmentIds = [...primaryIds, ...secondaryIds];
@@ -1197,6 +1207,28 @@ function computeResponsiveLayout(
 // ═══════════════════════════════════════════════════════════════════════════
 // Extension
 // ═══════════════════════════════════════════════════════════════════════════
+
+function warnInvalidSegmentSettings(ctx: any): void {
+  if (config.invalidDisabledSegments.length > 0) {
+    const invalid = config.invalidDisabledSegments.map((id) => JSON.stringify(id)).join(", ");
+    const message = `Ignoring unknown powerline disabled segment${config.invalidDisabledSegments.length === 1 ? "" : "s"}: ${invalid}`;
+    console.warn(`[powerline-footer] ${message}`);
+    if (ctx.hasUI) ctx.ui.notify(message, "warning");
+  }
+
+  if (config.invalidLayoutSegments.length > 0) {
+    const invalid = config.invalidLayoutSegments.map((id) => JSON.stringify(id)).join(", ");
+    const message = `Ignoring unknown powerline layout segment${config.invalidLayoutSegments.length === 1 ? "" : "s"}: ${invalid}`;
+    console.warn(`[powerline-footer] ${message}`);
+    if (ctx.hasUI) ctx.ui.notify(message, "warning");
+  }
+
+  if (config.invalidPlacement !== null) {
+    const message = `Ignoring invalid powerline placement: ${JSON.stringify(config.invalidPlacement)}`;
+    console.warn(`[powerline-footer] ${message}`);
+    if (ctx.hasUI) ctx.ui.notify(message, "warning");
+  }
+}
 
 export default function powerlineFooter(pi: ExtensionAPI) {
   const startupSettings = readSettings();
@@ -1689,6 +1721,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     bashModeSettings = parseBashModeSettings(settings, resolvedShortcuts);
     showLastPrompt = settings.showLastPrompt !== false;
     config = parsePowerlineConfig(settings.powerline, PRESET_NAMES);
+    warnInvalidSegmentSettings(ctx);
     stashedPromptHistory = readPersistedStashHistory();
     bashModeActive = false;
     bashTranscript = new BashTranscriptStore(bashModeSettings);
@@ -2261,6 +2294,29 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         return;
       }
 
+      const placementMatch = /^placement(?:\s+(above|below|toggle))?$/.exec(normalizedArgs);
+      if (placementMatch) {
+        const requestedPlacement = placementMatch[1];
+        config.placement = requestedPlacement === "above" || requestedPlacement === "below"
+          ? requestedPlacement
+          : config.placement === "above" ? "below" : "above";
+        config.invalidPlacement = null;
+        if (enabled && ctx.hasUI) {
+          if (config.fixedEditor && tuiRef && currentEditor) {
+            installFixedEditorCompositor(ctx, tuiRef);
+          } else if (!config.fixedEditor) {
+            installPowerlineWidgets(ctx);
+          }
+        }
+
+        if (writePowerlineOptionSetting(ctx.cwd, { placement: config.placement }, config.preset)) {
+          ctx.ui.notify(`Powerline placement set to: ${config.placement}`, "info");
+        } else {
+          ctx.ui.notify(`Powerline placement set to: ${config.placement} (not persisted; check settings.json)`, "warning");
+        }
+        return;
+      }
+
       const fixedEditorMatch = /^fixed-editor(?:\s+(on|off|toggle))?$/.exec(normalizedArgs);
       if (fixedEditorMatch) {
         const mode = fixedEditorMatch[1] ?? "toggle";
@@ -2430,6 +2486,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       sessionId: ctx.sessionManager?.getSessionId?.(),
       cwd: ctx.cwd,
       usageStats: { input, output, cacheRead, cacheWrite, cost },
+      contextTokens,
       contextPercent,
       contextWindow,
       autoCompactEnabled: ctx.settingsManager?.getCompactionSettings?.()?.enabled ?? true,
@@ -2514,7 +2571,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     return notifications;
   }
 
-  function renderPowerlineTopLines(width: number, theme: Theme): string[] {
+  function renderPowerlinePrimaryLines(width: number, theme: Theme): string[] {
     if (!currentCtx) return [];
 
     const layout = getResponsiveLayout(width, theme);
@@ -2677,7 +2734,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           width,
           terminalRows,
           statusLines: [...aboveWidgetLines, ...renderPowerlineStatusLines(width), ...statusContainerLines],
-          topLines: renderPowerlineTopLines(width, theme),
+          primaryLines: renderPowerlinePrimaryLines(width, theme),
+          placement: config.placement,
           editorLines: fixedEditorContainer ? compositor.renderHidden(fixedEditorContainer, width) : [],
           secondaryLines: [...renderPowerlineSecondaryLines(width, theme), ...belowWidgetLines],
           transcriptLines: renderBashTranscriptLines(width, theme),
@@ -2810,9 +2868,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
         resetLayoutCache();
       },
       render(width: number): string[] {
-        return renderPowerlineTopLines(width, theme);
+        return renderPowerlinePrimaryLines(width, theme);
       },
-    }), { placement: "aboveEditor" });
+    }), { placement: config.placement === "below" ? "belowEditor" : "aboveEditor" });
 
     ctx.ui.setWidget("powerline-secondary", (_tui: any, theme: Theme) => ({
       dispose() {},
@@ -3095,8 +3153,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     const providerName = ctx.model?.provider || "Unknown";
     const loadedCounts = discoverLoadedCounts();
     const recentSessions = getRecentSessions(3);
+    const initialContextTokens = estimateInitialContextTokens(ctx);
     
-    const header = new WelcomeHeader(modelName, providerName, recentSessions, loadedCounts);
+    const header = new WelcomeHeader(modelName, providerName, recentSessions, loadedCounts, initialContextTokens);
     welcomeHeaderActive = true;
     
     ctx.ui.setHeader(() => {
@@ -3135,6 +3194,8 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       if (hasActivity) {
         return;
       }
+
+      const initialContextTokens = estimateInitialContextTokens(ctx);
       
       ctx.ui.custom(
         (tui: any, _theme: any, _keybindings: any, done: (result: void) => void) => {
@@ -3143,6 +3204,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             providerName,
             recentSessions,
             loadedCounts,
+            initialContextTokens,
           );
           
           let countdown = 30;
