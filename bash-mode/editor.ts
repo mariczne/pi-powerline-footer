@@ -449,7 +449,7 @@ export class BashModeEditor extends CustomEditor {
       })
       .catch((error) => {
         if (error instanceof Error && error.message === "aborted") return;
-        console.debug("[powerline-footer] Failed to resolve bash ghost suggestion:", error);
+        console.debug("[pi-power-user] Failed to resolve bash ghost suggestion:", error);
       });
   }
 }

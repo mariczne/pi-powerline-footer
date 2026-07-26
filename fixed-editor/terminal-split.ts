@@ -604,7 +604,7 @@ export class TerminalSplitCompositor {
   install(): void {
     if (this.installed) return;
     if (typeof this.terminal.write !== "function") {
-      throw new Error("[powerline-footer] Fixed editor compositor expected terminal.write(data) to exist");
+      throw new Error("[pi-power-user] Fixed editor compositor expected terminal.write(data) to exist");
     }
 
     this.originalWrite(

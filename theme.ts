@@ -1,5 +1,5 @@
 /**
- * Theme system for powerline-footer
+ * Theme system for pi-power-user
  * 
  * Colors are resolved in order:
  * 1. User overrides from theme.json (if exists)

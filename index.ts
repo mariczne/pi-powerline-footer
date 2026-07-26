@@ -374,7 +374,7 @@ function readSettingsFile(settingsPath: string): Record<string, unknown> {
 
     const parsed = JSON.parse(readFileSync(settingsPath, "utf-8"));
     if (!isRecord(parsed)) {
-      console.debug(`[powerline-footer] Ignoring non-object settings at ${settingsPath}`);
+      console.debug(`[pi-power-user] Ignoring non-object settings at ${settingsPath}`);
       return {};
     }
 
@@ -382,7 +382,7 @@ function readSettingsFile(settingsPath: string): Record<string, unknown> {
   } catch (error) {
     // Settings are user-edited input. Log and keep the extension running with defaults
     // instead of crashing the UI during startup.
-    console.debug(`[powerline-footer] Failed to read settings from ${settingsPath}:`, error);
+    console.debug(`[pi-power-user] Failed to read settings from ${settingsPath}:`, error);
     return {};
   }
 }
@@ -395,7 +395,7 @@ function readWritableSettingsFile(settingsPath: string): Record<string, unknown>
   try {
     const parsed = JSON.parse(readFileSync(settingsPath, "utf-8"));
     if (!isRecord(parsed)) {
-      console.debug(`[powerline-footer] Refusing to write settings to non-object file at ${settingsPath}`);
+      console.debug(`[pi-power-user] Refusing to write settings to non-object file at ${settingsPath}`);
       return null;
     }
 
@@ -403,7 +403,7 @@ function readWritableSettingsFile(settingsPath: string): Record<string, unknown>
   } catch (error) {
     // Do not overwrite malformed user settings with partial data. Surface the failure
     // through the command handler so the user can fix the file intentionally.
-    console.debug(`[powerline-footer] Failed to parse settings at ${settingsPath}:`, error);
+    console.debug(`[pi-power-user] Failed to parse settings at ${settingsPath}:`, error);
     return null;
   }
 }
@@ -415,7 +415,7 @@ function readCompactionPolicyEnabled(configPath: string): boolean | undefined {
     if (!isRecord(parsed) || typeof parsed.enabled !== "boolean") return false;
     return parsed.enabled;
   } catch (error) {
-    console.debug(`[powerline-footer] Failed to read compaction policy from ${configPath}:`, error);
+    console.debug(`[pi-power-user] Failed to read compaction policy from ${configPath}:`, error);
     return false;
   }
 }
@@ -434,7 +434,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getStashHistoryPath(): string {
-  return getAgentPath("powerline-footer", "stash-history.json");
+  return getAgentPath("pi-power-user", "stash-history.json");
 }
 
 function getSessionsPath(): string {
@@ -573,13 +573,13 @@ function readPersistedStashHistory(): string[] {
 
     const parsed = JSON.parse(readFileSync(stashHistoryPath, "utf-8"));
     if (!isRecord(parsed)) {
-      console.debug(`[powerline-footer] Ignoring invalid stash history at ${stashHistoryPath}`);
+      console.debug(`[pi-power-user] Ignoring invalid stash history at ${stashHistoryPath}`);
       return [];
     }
 
     return normalizeStashHistoryEntries(parsed.history);
   } catch (error) {
-    console.debug(`[powerline-footer] Failed to read stash history from ${stashHistoryPath}:`, error);
+    console.debug(`[pi-power-user] Failed to read stash history from ${stashHistoryPath}:`, error);
     return [];
   }
 }
@@ -595,7 +595,7 @@ function persistStashHistory(history: string[]): void {
     mkdirSync(dirname(stashHistoryPath), { recursive: true });
     writeFileSync(stashHistoryPath, JSON.stringify(payload, null, 2) + "\n");
   } catch (error) {
-    console.debug(`[powerline-footer] Failed to persist stash history to ${stashHistoryPath}:`, error);
+    console.debug(`[pi-power-user] Failed to persist stash history to ${stashHistoryPath}:`, error);
   }
 }
 
@@ -624,7 +624,7 @@ function writePowerlineSetting(cwd: string, update: (existingPowerlineSetting: u
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
     return true;
   } catch (error) {
-    console.debug(`[powerline-footer] Failed to persist powerline setting to ${settingsPath}:`, error);
+    console.debug(`[pi-power-user] Failed to persist powerline setting to ${settingsPath}:`, error);
     return false;
   }
 }
@@ -1041,12 +1041,12 @@ export function resolveShortcutConfig(settings: Record<string, unknown>): Powerl
 
     const replacement = findShortcutReplacement(key, used, resolved);
     if (!replacement) {
-      console.debug(`[powerline-footer] Shortcut conflict for ${key}: "${configured}" is already in use`);
+      console.debug(`[pi-power-user] Shortcut conflict for ${key}: "${configured}" is already in use`);
       continue;
     }
 
     console.debug(
-      `[powerline-footer] Shortcut conflict for ${key}: "${configured}" replaced with "${replacement}"`,
+      `[pi-power-user] Shortcut conflict for ${key}: "${configured}" replaced with "${replacement}"`,
     );
 
     resolved[key] = replacement;
@@ -1083,7 +1083,7 @@ export function parseBashModeSettings(settings: Record<string, unknown>, powerli
 
   if (configuredToggleShortcut && toggleShortcut !== configuredToggleShortcut) {
     console.debug(
-      `[powerline-footer] Bash mode shortcut conflict: "${configuredToggleShortcut}" replaced with "${toggleShortcut ?? "disabled"}"`,
+      `[pi-power-user] Bash mode shortcut conflict: "${configuredToggleShortcut}" replaced with "${toggleShortcut ?? "disabled"}"`,
     );
   }
   const transcriptMaxLines = typeof raw.transcriptMaxLines === "number" && Number.isFinite(raw.transcriptMaxLines)
@@ -1212,20 +1212,20 @@ function warnInvalidSegmentSettings(ctx: any): void {
   if (config.invalidDisabledSegments.length > 0) {
     const invalid = config.invalidDisabledSegments.map((id) => JSON.stringify(id)).join(", ");
     const message = `Ignoring unknown powerline disabled segment${config.invalidDisabledSegments.length === 1 ? "" : "s"}: ${invalid}`;
-    console.warn(`[powerline-footer] ${message}`);
+    console.warn(`[pi-power-user] ${message}`);
     if (ctx.hasUI) ctx.ui.notify(message, "warning");
   }
 
   if (config.invalidLayoutSegments.length > 0) {
     const invalid = config.invalidLayoutSegments.map((id) => JSON.stringify(id)).join(", ");
     const message = `Ignoring unknown powerline layout segment${config.invalidLayoutSegments.length === 1 ? "" : "s"}: ${invalid}`;
-    console.warn(`[powerline-footer] ${message}`);
+    console.warn(`[pi-power-user] ${message}`);
     if (ctx.hasUI) ctx.ui.notify(message, "warning");
   }
 
   if (config.invalidPlacement !== null) {
     const message = `Ignoring invalid powerline placement: ${JSON.stringify(config.invalidPlacement)}`;
-    console.warn(`[powerline-footer] ${message}`);
+    console.warn(`[pi-power-user] ${message}`);
     if (ctx.hasUI) ctx.ui.notify(message, "warning");
   }
 }
@@ -1776,7 +1776,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           previousViewportTop: tuiRef?.previousViewportTop,
         }));
       } catch (error) {
-        console.debug("[powerline-footer] Failed to restore inline editor cursor on quit:", error);
+        console.debug("[pi-power-user] Failed to restore inline editor cursor on quit:", error);
       }
     }
     stashShortcutInputUnsubscribe?.();
@@ -2664,15 +2664,15 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
     if (!ctx.hasUI || !config.fixedEditor) return;
     if (!tui?.terminal || typeof tui.terminal.write !== "function") {
-      throw new Error("[powerline-footer] Fixed editor compositor could not find tui.terminal.write()");
+      throw new Error("[pi-power-user] Fixed editor compositor could not find tui.terminal.write()");
     }
     if (!currentEditor) {
-      throw new Error("[powerline-footer] Fixed editor compositor expected the custom editor to be installed first");
+      throw new Error("[pi-power-user] Fixed editor compositor expected the custom editor to be installed first");
     }
 
     const editorContainerMatch = findContainerWithChild(tui, currentEditor);
     if (!editorContainerMatch) {
-      throw new Error("[powerline-footer] Fixed editor compositor could not find the editor container in TUI children");
+      throw new Error("[pi-power-user] Fixed editor compositor could not find the editor container in TUI children");
     }
 
     const tuiChildren = Array.isArray(tui.children) ? tui.children : [];
@@ -3253,7 +3253,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
           }),
         },
       ).catch((error) => {
-        console.debug("[powerline-footer] Welcome overlay failed:", error);
+        console.debug("[pi-power-user] Welcome overlay failed:", error);
       });
     }, 100);
   }
