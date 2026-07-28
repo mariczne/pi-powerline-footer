@@ -131,6 +131,7 @@ under `PI_CODING_AGENT_DIR`) or project-local `.pi/settings.json`:
     "welcome": false,
     "mouseScroll": true,
     "scrollAwayNavigationCard": false,
+    "copyOnSelect": true,
     "customItems": [
       {
         "id": "ci",
@@ -158,6 +159,10 @@ under `PI_CODING_AGENT_DIR`) or project-local `.pi/settings.json`:
 regular editor modes. It moves only the primary powerline row; notifications and
 Pi working status stay above, while responsive overflow, bash transcript, and
 the last-prompt reminder stay below.
+
+Set `"copyOnSelect": false` to keep mouse selections highlighted instead of
+automatically copying on release. Copy the active selection explicitly with
+`ctrl+c` or right-click.
 
 `"layout"` overrides segment order and grouping per preset row. A present
 `left`, `right`, or `secondary` array replaces that preset group exactly; an
