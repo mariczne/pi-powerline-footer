@@ -2698,6 +2698,13 @@ export default function powerlineFooter(pi: ExtensionAPI) {
     compositor = new TerminalSplitCompositor({
       tui,
       terminal: tui.terminal,
+      canRepaintClusterOnly: () => {
+        const children = fixedEditorContainer?.children;
+        return Array.isArray(children)
+          && children.length > 0
+          && currentEditor !== null
+          && !children.includes(currentEditor);
+      },
       mouseScroll: config.mouseScroll,
       keyboardScrollShortcuts: {
         up: resolvedShortcuts.scrollChatUp,
