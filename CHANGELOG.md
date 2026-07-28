@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **Separator override** — Added `powerline.separator` so separator style can be chosen independently of the active preset.
+- **Git host icon** — Added opt-in `powerline.git.hostIcon` to show the detected origin host icon in the branch label.
+- **Segment display formats** — Added opt-in `powerline.context.format` and `powerline.cache_read.format` settings for percentage-style displays.
+- **Selection copy control** — Added `powerline.copyOnSelect` (default `true`); disabling it keeps selections highlighted for explicit `ctrl+c` or right-click copying.
 - **Shortcut palette** — `/powerline shortcuts` or `ctrl+shift+k` opens a searchable command palette with the active Powerline bindings (prefixed `Powerline: `) plus standard pi keybindings. Fuzzy-search by typing, run the highlighted action with enter. Editor keybindings appear as reference entries; bindings scoped to pi's modal selectors are omitted since those UIs show their own hints.
 - **Welcome toggle** — Added `powerline.welcome` so the startup welcome UI can be disabled without disabling the footer. Thanks to OCPdev25, miloslavnosek, vzeazy, and Florian Kinder (@fank) for #48/#89.
 - **Display options** — Added `powerline.cost.subscriptionDisplay` and `powerline.model.display` for subscription cost and provider-qualified model names. Thanks to Alexandr Burdiyan (@burdiyan), Meidhy (@dymayday), Mathu Mounasamy (@Mathuv), and pserey for #3/#83/#50.
@@ -18,6 +22,9 @@
 - **Fixed `custom` preset** — Use `powerline.layout` with another preset instead.
 
 ### Changed
+- **Fixed-editor repainting** — Avoids rerendering static chat when fixed inline UI repaints without viewport geometry changes.
+- **Status render caching** — Caches session token aggregation and serves stale git values during background refreshes to reduce redraw work and flicker.
+- **Fixed-editor scrolling performance** — Uses terminal row shifts, cached transcript lines, throttled repainting, and transient shortcut-card hiding during wheel movement.
 - **Welcome is now opt-in** — The startup welcome overlay/header is off by default. Set `powerline.welcome: true` to re-enable it. Previously it was on by default and required `powerline.welcome: false` to disable.
 - **Fixed-editor scroll-away card** — The scroll-away navigation card is now opt-in through `powerline.scrollAwayNavigationCard` or `/powerline scroll-away-card on`.
 - **Thinking level colors** — `high` now uses the normal `thinkingHigh` theme color; only `xhigh` and `max` use the rainbow treatment.
@@ -32,6 +39,8 @@
 - **Maximum thinking style** — Pi's `max` thinking level uses the rainbow treatment alongside `xhigh`. Thanks to @AiraNadih for #94.
 
 ### Fixed
+- **Theme override path** — Loads `theme.json` from the documented agent-dir `extensions/powerline-footer` path before the installed package directory.
+- **Print-mode terminal cleanup** — Runs terminal resets and cursor restoration only during interactive TUI shutdowns so `pi -p` output remains visible.
 - **Fixed-editor wheel bursts** — Coalesces rapid mouse-wheel packets into throttled viewport repaints and defers the follow-up TUI render until scrolling settles, reducing flicker and slowdowns in terminal multiplexers.
 - **Welcome discovery noise** — Ignored vanished/dangling skill, extension, and prompt-template entries during welcome overlay discovery instead of printing stack traces.
 - **Reload keyboard protocol** — Preserves extended keyboard modes on `/reload` and only hard-resets them on real quit. Thanks to Francesco Buldo (@frabul), Alexander Gerdes (@Avg8888), and Sylvain Rivierre (@slhad) for #81/#82/#85.
