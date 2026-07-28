@@ -126,6 +126,7 @@ under `PI_CODING_AGENT_DIR`) or project-local `.pi/settings.json`:
 {
   "powerline": {
     "preset": "default",
+    "separator": "chevron",
     "fixedEditor": true,
     "placement": "above",
     "welcome": false,
@@ -168,7 +169,8 @@ automatically copying on release. Copy the active selection explicitly with
 `left`, `right`, or `secondary` array replaces that preset group exactly; an
 empty array clears it. Omitted groups keep the preset entries and automatically
 append custom items by their configured `position`. `disabledSegments` is
-applied after layout.
+applied after layout. Set `"separator"` to any documented separator style to
+override the preset's separator independently.
 
 Segment display formats are opt-in; defaults preserve the existing rendering:
 
