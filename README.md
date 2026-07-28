@@ -177,6 +177,10 @@ Segment display formats are opt-in; defaults preserve the existing rendering:
 | `"context": { "format" }` | `"full"` / `"percent"` | `"full"` | Shows full token usage or a bare rounded percentage |
 | `"cache_read": { "format" }` | `"tokens"` / `"percent"` | `"tokens"` | Shows raw tokens or cache hit rate |
 
+Set `"git": { "hostIcon": true }` to replace the branch icon with the detected
+origin host logo (GitHub, GitLab, Bitbucket, or generic git). ASCII setups and
+repositories without an origin retain the regular branch icon.
+
 ### Shortcut configuration
 
 ```json
