@@ -124,6 +124,7 @@ under `PI_CODING_AGENT_DIR`) or project-local `.pi/settings.json`:
 
 ```json
 {
+  "showLastPrompt": true,
   "powerline": {
     "preset": "default",
     "separator": "chevron",
@@ -159,7 +160,8 @@ under `PI_CODING_AGENT_DIR`) or project-local `.pi/settings.json`:
 `"placement"` accepts `"above"` (default) or `"below"` in both fixed and
 regular editor modes. It moves only the primary powerline row; notifications and
 Pi working status stay above, while responsive overflow, bash transcript, and
-the last-prompt reminder stay below.
+the last-prompt reminder stay below. Set `"showLastPrompt": false` at the top
+level of `settings.json` (not inside `powerline`) to hide that reminder.
 
 Set `"copyOnSelect": false` to keep mouse selections highlighted instead of
 automatically copying on release. Copy the active selection explicitly with
@@ -228,6 +230,14 @@ duplicate conflicts automatically fall back to safe defaults.
 | `subscription` | `(sub)` | `(sub)` |
 | `reported-cost` | `$0.12` | `(sub)` |
 | `both` | `$0.12 (sub)` | `(sub)` |
+
+### Theme overrides
+
+Create `extensions/powerline-footer/theme.json` in the agent dir (`~/.pi/agent`
+by default, or `PI_CODING_AGENT_DIR` when set). The agent-dir override is loaded
+before a `theme.json` colocated with the installed package. Use `/reload` or
+restart Pi after editing it. See `theme.example.json` for available colors and
+icons.
 
 ## Divergence from upstream
 
