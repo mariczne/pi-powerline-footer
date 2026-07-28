@@ -170,6 +170,13 @@ empty array clears it. Omitted groups keep the preset entries and automatically
 append custom items by their configured `position`. `disabledSegments` is
 applied after layout.
 
+Segment display formats are opt-in; defaults preserve the existing rendering:
+
+| Segment option | Values | Default | Effect |
+|---|---|---|---|
+| `"context": { "format" }` | `"full"` / `"percent"` | `"full"` | Shows full token usage or a bare rounded percentage |
+| `"cache_read": { "format" }` | `"tokens"` / `"percent"` | `"tokens"` | Shows raw tokens or cache hit rate |
+
 ### Shortcut configuration
 
 ```json

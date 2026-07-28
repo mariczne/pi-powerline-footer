@@ -96,6 +96,8 @@ export interface StatusLineSegmentOptions {
   };
   time?: { format?: "12h" | "24h"; showSeconds?: boolean };
   cost?: { subscriptionDisplay?: "subscription" | "reported-cost" | "both" };
+  context?: { format?: "full" | "percent" };
+  cache_read?: { format?: "tokens" | "percent" };
 }
 
 export type CustomItemPosition = "left" | "right" | "secondary";
