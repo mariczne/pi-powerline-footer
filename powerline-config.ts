@@ -14,7 +14,7 @@ export interface PowerlineConfig {
   mouseScroll: boolean;
   fixedEditor: boolean;
   scrollAwayNavigationCard: boolean;
-  /** Whether mouse text selection copies to clipboard. Default true. */
+  /** Whether mouse text selection copies to clipboard. Default false. */
   copyOnSelect: boolean;
   placement: PowerlinePlacement;
   invalidPlacement: string | null;
@@ -303,7 +303,7 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
     mouseScroll: true,
     fixedEditor: true,
     scrollAwayNavigationCard: false,
-    copyOnSelect: true,
+    copyOnSelect: false,
     placement: "above",
     invalidPlacement: null,
     welcome: false,
@@ -332,7 +332,7 @@ export function parsePowerlineConfig(value: unknown, presets: readonly StatusLin
     mouseScroll: value.mouseScroll !== false,
     fixedEditor: value.fixedEditor !== false,
     scrollAwayNavigationCard: value.scrollAwayNavigationCard === true,
-    copyOnSelect: value.copyOnSelect !== false,
+    copyOnSelect: value.copyOnSelect === true,
     placement,
     invalidPlacement,
     welcome: value.welcome === true,

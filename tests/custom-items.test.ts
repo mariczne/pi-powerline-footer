@@ -33,7 +33,7 @@ test("parsePowerlineConfig supports object config with custom items", () => {
   assert.equal(config.mouseScroll, true);
   assert.equal(config.fixedEditor, true);
   assert.equal(config.scrollAwayNavigationCard, false);
-  assert.equal(config.copyOnSelect, true);
+  assert.equal(config.copyOnSelect, false);
   assert.equal(config.separator, null);
   assert.equal(config.placement, "above");
   assert.equal(config.invalidPlacement, null);
@@ -165,15 +165,15 @@ test("parsePowerlineConfig supports disabling mouse scroll", () => {
   assert.equal(config.mouseScroll, false);
 });
 
-test("parsePowerlineConfig supports disabling fixed editor", () => {
+test("parsePowerlineConfig supports disabling fixed editor and opting into copy-on-select", () => {
   const config = parsePowerlineConfig(
-    { preset: "compact", fixedEditor: false, copyOnSelect: false },
+    { preset: "compact", fixedEditor: false, copyOnSelect: true },
     ["default", "compact"],
   );
 
   assert.equal(config.preset, "compact");
   assert.equal(config.fixedEditor, false);
-  assert.equal(config.copyOnSelect, false);
+  assert.equal(config.copyOnSelect, true);
 });
 
 test("parsePowerlineConfig supports welcome, shortcut, and navigation-card toggles", () => {

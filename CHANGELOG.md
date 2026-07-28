@@ -6,7 +6,7 @@
 - **Separator override** — Added `powerline.separator` so separator style can be chosen independently of the active preset.
 - **Git host icon** — Added opt-in `powerline.git.hostIcon` to show the detected origin host icon in the branch label.
 - **Segment display formats** — Added opt-in `powerline.context.format` and `powerline.cache_read.format` settings for percentage-style displays.
-- **Selection copy control** — Added `powerline.copyOnSelect` (default `true`); disabling it keeps selections highlighted for explicit `ctrl+c` or right-click copying.
+- **Selection copy control** — Added opt-in `powerline.copyOnSelect`; selections stay highlighted by default for explicit `ctrl+c` or right-click copying.
 - **Shortcut palette** — `/powerline shortcuts` or `ctrl+shift+k` opens a searchable command palette with the active Powerline bindings (prefixed `Powerline: `) plus standard pi keybindings. Fuzzy-search by typing, run the highlighted action with enter. Editor keybindings appear as reference entries; bindings scoped to pi's modal selectors are omitted since those UIs show their own hints.
 - **Welcome toggle** — Added `powerline.welcome` so the startup welcome UI can be disabled without disabling the footer. Thanks to OCPdev25, miloslavnosek, vzeazy, and Florian Kinder (@fank) for #48/#89.
 - **Display options** — Added `powerline.cost.subscriptionDisplay` and `powerline.model.display` for subscription cost and provider-qualified model names. Thanks to Alexandr Burdiyan (@burdiyan), Meidhy (@dymayday), Mathu Mounasamy (@Mathuv), and pserey for #3/#83/#50.

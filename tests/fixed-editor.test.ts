@@ -1893,7 +1893,7 @@ test("terminal split with autoCopyOnSelect disabled still copies selection on ri
   compositor.dispose();
 });
 
-test("terminal split auto-copies on release by default without showing the hint", () => {
+test("terminal split auto-copies on release when enabled without showing the hint", () => {
   const terminal = new FakeTerminal();
   let inputListener: ((data: string) => { consume?: boolean; data?: string } | undefined) | null = null;
   const copied: Array<{ text: string; source: string }> = [];
@@ -1919,6 +1919,7 @@ test("terminal split auto-copies on release by default without showing the hint"
   const compositor = new TerminalSplitCompositor({
     tui,
     terminal,
+    autoCopyOnSelect: true,
     onCopySelection: (text, source) => copied.push({ text, source }),
     renderCluster: () => ({ lines: ["cluster-a", "cluster-b"], cursor: null }),
   });

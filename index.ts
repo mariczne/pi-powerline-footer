@@ -65,7 +65,7 @@ let config: PowerlineConfig = {
   mouseScroll: true,
   fixedEditor: true,
   scrollAwayNavigationCard: false,
-  copyOnSelect: true,
+  copyOnSelect: false,
   placement: "above",
   invalidPlacement: null,
   welcome: false,
@@ -2713,7 +2713,7 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       scrollRepaintThrottleMs: DEFAULT_SCROLL_REPAINT_THROTTLE_MS,
       scrollAwayNavigationCard,
       onCopySelection: (text, source) => copyTextToClipboard(ctx, text, source === "explicit" ? "Copied selection" : undefined),
-      autoCopyOnSelect: config.copyOnSelect !== false,
+      autoCopyOnSelect: config.copyOnSelect,
       getShowHardwareCursor: () => typeof tui.getShowHardwareCursor === "function" && tui.getShowHardwareCursor(),
       renderCluster: (width, terminalRows) => {
         const theme = readRenderTheme();

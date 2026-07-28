@@ -133,7 +133,7 @@ under `PI_CODING_AGENT_DIR`) or project-local `.pi/settings.json`:
     "welcome": false,
     "mouseScroll": true,
     "scrollAwayNavigationCard": false,
-    "copyOnSelect": true,
+    "copyOnSelect": false,
     "customItems": [
       {
         "id": "ci",
@@ -163,9 +163,9 @@ Pi working status stay above, while responsive overflow, bash transcript, and
 the last-prompt reminder stay below. Set `"showLastPrompt": false` at the top
 level of `settings.json` (not inside `powerline`) to hide that reminder.
 
-Set `"copyOnSelect": false` to keep mouse selections highlighted instead of
-automatically copying on release. Copy the active selection explicitly with
-`ctrl+c` or right-click.
+Mouse selections stay highlighted by default. Copy the active selection with
+`ctrl+c` or right-click. Set `"copyOnSelect": true` to copy automatically when
+the mouse button is released.
 
 `"layout"` overrides segment order and grouping per preset row. A present
 `left`, `right`, or `secondary` array replaces that preset group exactly; an
