@@ -8,6 +8,7 @@ import {
   emergencyTerminalModeReset,
   endSynchronizedOutput,
   beginSynchronizedOutput,
+  kittyImageCleanupSequence,
   moveCursor,
   resetScrollRegion,
   setScrollRegion,
@@ -2205,6 +2206,16 @@ test("terminal split keyboard scroll accepts configured shortcuts", () => {
   compositor.dispose();
 });
 
+test("Kitty image cleanup uses tmux passthrough inside tmux", () => {
+  const raw = "\x1b_Ga=d,d=A,q=2\x1b\\";
+
+  assert.equal(kittyImageCleanupSequence(false), raw);
+  assert.equal(
+    kittyImageCleanupSequence(true),
+    `\x1bPtmux;\x1b\x1b_Ga=d,d=A,q=2\x1b\x1b\\\x1b\\`,
+  );
+});
+
 test("terminal split clears Kitty images when the scroll viewport moves", () => {
   const terminal = new FakeTerminal();
   let inputListener: ((data: string) => { consume?: boolean; data?: string } | undefined) | null = null;
@@ -2234,7 +2245,7 @@ test("terminal split clears Kitty images when the scroll viewport moves", () => 
 
   assert.deepEqual(inputListener?.("\x1b[5~"), { consume: true });
   assert.equal(terminal.writes.length, 1);
-  assert.match(terminal.writes[0] ?? "", /\x1b_Ga=d,d=A,q=2\x1b\\/);
+  assert.ok((terminal.writes[0] ?? "").includes(kittyImageCleanupSequence()));
 
   terminal.writes = [];
   terminal.write("root update");

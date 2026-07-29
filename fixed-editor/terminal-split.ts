@@ -9,6 +9,18 @@ export interface TerminalLike {
   write(data: string): void;
 }
 
+/**
+ * Return Kitty's delete-all command unchanged in a regular terminal, or wrap
+ * it in tmux's DCS passthrough envelope when running inside tmux. Raw Kitty
+ * graphics use APC (ESC _ ... ST), which tmux otherwise interprets as a pane
+ * title. ESC bytes inside the passthrough payload must be doubled.
+ */
+export function kittyImageCleanupSequence(insideTmux = Boolean(process.env.TMUX)): string {
+  const sequence = deleteAllKittyImages();
+  if (!insideTmux) return sequence;
+  return `\x1bPtmux;${sequence.replaceAll("\x1b", "\x1b\x1b")}\x1b\\`;
+}
+
 interface KeyboardScrollShortcuts {
   up: string | null;
   down: string | null;
@@ -1643,7 +1655,7 @@ export class TerminalSplitCompositor {
   private consumePendingImageCleanup(): string {
     if (!this.pendingImageCleanup) return "";
     this.pendingImageCleanup = false;
-    return deleteAllKittyImages();
+    return kittyImageCleanupSequence();
   }
 
   private mouseReportingStateGuard(): string {
